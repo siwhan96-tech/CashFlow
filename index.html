@@ -298,6 +298,42 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 }
 .typetoggle button.active[data-type=income]{background:#eaf1ff;color:var(--income);border-color:var(--income);}
 .typetoggle button.active[data-type=expense]{background:#fdecec;color:var(--expense);border-color:var(--expense);}
+/* ===== 달력 ===== */
+.calwrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;}
+.calhead{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px;}
+.calhead div{text-align:center;font-size:12px;font-weight:700;color:var(--text-dim);padding:4px 0;}
+.calhead div.sun{color:var(--expense);}
+.calhead div.sat{color:var(--income);}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.calcell{min-height:76px;border:1px solid transparent;border-radius:9px;padding:4px 3px;background:#fafbfc;cursor:pointer;overflow:hidden;}
+.calcell.out{opacity:.3;}
+.calcell.today{background:var(--primary-dim);}
+.calcell.sel{border-color:var(--primary);box-shadow:0 0 0 2px rgba(79,70,229,.18);}
+.caldnum{font-size:12px;font-weight:700;margin-bottom:3px;text-align:center;color:var(--text);}
+.caldnum.sun,.caldnum.hol{color:var(--expense);}
+.caldnum.sat{color:var(--income);}
+.evbar{font-size:10px;line-height:1.4;border-radius:4px;padding:1px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;}
+.evbar.h{background:#2563eb;} .evbar.w{background:#db2777;} .evbar.both{background:#7c3aed;}
+.evmore{font-size:10px;color:var(--text-dim);padding-left:3px;}
+.calamt{font-size:10px;font-weight:700;line-height:1.45;text-align:right;padding-right:2px;white-space:nowrap;overflow:hidden;}
+.calamt.inc{color:var(--income);} .calamt.exp{color:var(--expense);}
+.calholname{font-size:9px;color:var(--expense);text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.calholname.off{color:var(--primary);}
+.caldnum.off{color:var(--primary);}
+.daybox{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-top:12px;}
+.dayhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.daytitle{font-size:15px;font-weight:800;}
+.daybtn{border:1px solid var(--primary);background:var(--primary);color:#fff;border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:700;white-space:nowrap;}
+.evrow{display:flex;align-items:center;gap:9px;padding:8px;border-radius:9px;background:#fafbfc;margin-bottom:6px;touch-action:pan-y;}
+.evrow.dragging{opacity:.4;background:var(--primary-dim);}
+.grip{flex:0 0 auto;width:24px;align-self:stretch;display:flex;align-items:center;justify-content:center;color:#b6bcc7;font-size:14px;letter-spacing:-2px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;}
+.evdot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;}
+.evdot.h{background:#2563eb;} .evdot.w{background:#db2777;} .evdot.both{background:#7c3aed;}
+.evbody{flex:1;min-width:0;cursor:pointer;}
+.evttl{font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.evsub{font-size:11px;color:var(--text-dim);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.calsum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.typetoggle button.active[data-owner]{background:var(--primary-dim);color:var(--primary);border-color:var(--primary);}
 .catpickrow{display:flex;gap:8px;}
 .catpickrow select{flex:1;}
 .catpickrow .smallbtn{
@@ -344,7 +380,10 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
     z-index:15;padding:6px 2px;
   }
   .bottomnav .navitem{
-    flex:1;flex-direction:column;gap:2px;padding:7px 2px;font-size:10.5px;border-radius:10px;
+    flex:1;min-width:0;flex-direction:column;gap:2px;padding:7px 1px;font-size:10px;border-radius:10px;
+  }
+  .bottomnav .navitem span:last-child{
+    width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   .bottomnav .navitem .ic{font-size:17px;width:auto;}
   .fab{bottom:84px;}
@@ -396,18 +435,12 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
         </div>
       </div>
 
-      <div class="tabpanel" id="panel-income" data-tab="income">
-        <div class="grid4" id="incomeSummary" style="grid-template-columns:repeat(2,1fr);"></div>
-        <div class="cardbox">
-          <div class="filters">
-            <select id="incomeCatFilter"><option value="">전체 카테고리</option></select>
-            <input type="text" id="incomeSearch" placeholder="메모 검색">
-          </div>
-          <div id="incomeList"></div>
-        </div>
-      </div>
-
       <div class="tabpanel" id="panel-category" data-tab="category">
+        <div class="typetoggle" id="catTypeToggle" style="margin-bottom:14px;">
+          <button type="button" data-type="expense">지출</button>
+          <button type="button" data-type="income">수입</button>
+        </div>
+        <div class="grid4" id="categorySummary" style="grid-template-columns:repeat(2,1fr);"></div>
         <div class="grid2">
           <div class="cardbox">
             <div class="cardtitle" id="catChartTitle">카테고리별 지출</div>
@@ -463,6 +496,17 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
           </div>
           <div id="cardList"></div>
         </div>
+      </div>
+
+      <div class="tabpanel" id="panel-schedule" data-tab="schedule">
+        <div id="scheduleCal"></div>
+        <div id="scheduleDay"></div>
+      </div>
+
+      <div class="tabpanel" id="panel-caldiary" data-tab="caldiary">
+        <div class="calsum" id="caldiarySummary"></div>
+        <div id="caldiaryCal"></div>
+        <div id="caldiaryDay"></div>
       </div>
 
       <div class="tabpanel" id="panel-loan" data-tab="loan">
@@ -679,6 +723,42 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
   </div>
 </div>
 
+<!-- Event modal -->
+<div class="overlay" id="eventOverlay">
+  <div class="modal">
+    <h3 id="eventModalTitle">일정 추가</h3>
+    <div class="field">
+      <label>제목</label>
+      <input type="text" id="fEvTitle" placeholder="예: 병원 예약">
+    </div>
+    <div class="field">
+      <label>누구 일정</label>
+      <div class="typetoggle" id="evOwnerToggle">
+        <button type="button" data-owner="h">남편</button>
+        <button type="button" data-owner="w">아내</button>
+        <button type="button" data-owner="both">공통</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>날짜</label>
+      <input type="date" id="fEvDate">
+    </div>
+    <div class="field">
+      <label>종료일 <span style="font-weight:400;color:var(--text-dim);">(하루짜리면 비워두세요)</span></label>
+      <input type="date" id="fEvEnd">
+    </div>
+    <div class="field">
+      <label>메모</label>
+      <input type="text" id="fEvMemo" placeholder="선택 사항">
+    </div>
+    <div class="modalbtns">
+      <button class="btn-danger" id="btnDeleteEvent" style="display:none;">삭제</button>
+      <button class="btn-ghost" id="btnCancelEvent">취소</button>
+      <button class="btn-primary" id="btnSaveEvent">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- Settings modal -->
 <div class="overlay" id="settingsOverlay">
   <div class="modal">
@@ -687,6 +767,12 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
       <label>시작 잔액</label>
       <input type="number" id="startBalanceInput" placeholder="0" inputmode="numeric">
     </div>
+    <div class="sectiontitle">👤 이 기기 사용자</div>
+    <div class="typetoggle" id="deviceOwnerToggle" style="margin-bottom:6px;">
+      <button type="button" data-owner="h">남편</button>
+      <button type="button" data-owner="w">아내</button>
+    </div>
+    <div class="acchint" style="margin:0 0 4px;">일정을 추가할 때 기본값으로 쓰입니다. 기기마다 따로 저장돼요.</div>
     <div class="sectiontitle">☁️ 실시간 동기화 (Firebase)</div>
     <div id="syncStatusText" class="sync-status"></div>
     <div class="field">
@@ -766,6 +852,7 @@ var fbReady = false;
 var syncDebounceTimer = null;
 var remoteRenderTimer = null;
 var lastSyncedTx = {};      // { txId: JSON 문자열 } — 서버와 마지막으로 맞춘 상태
+var lastSyncedEv = {};      // { eventId: JSON 문자열 }
 var lastMetaJson = "";
 var metaLoaded = false;
 
@@ -792,11 +879,14 @@ function persistLocal(){
 }
 
 function loadSnapshot(){
-  try{ lastSyncedTx = JSON.parse(localStorage.getItem(SNAPSHOT_KEY)) || {}; }
-  catch(e){ lastSyncedTx = {}; }
+  try{
+    var o = JSON.parse(localStorage.getItem(SNAPSHOT_KEY)) || {};
+    lastSyncedTx = o.tx || o;      // 구버전 형식(거래만) 호환
+    lastSyncedEv = o.ev || {};
+  }catch(e){ lastSyncedTx = {}; lastSyncedEv = {}; }
 }
 function saveSnapshot(){
-  try{ localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(lastSyncedTx)); }catch(e){}
+  try{ localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ tx: lastSyncedTx, ev: lastSyncedEv })); }catch(e){}
 }
 
 function setSyncBadge(status, text){
@@ -874,25 +964,30 @@ function firebaseInit(){
 }
 
 /* 시작 시: 서버 ↔ 로컬 차이를 정리한 뒤 실시간 리스너 부착 */
+function reconcileList(remote, key, snapMap, ref){
+  var kept = [], upload = {};
+  (state[key] || []).forEach(function(it){
+    if(remote[it.id]) kept.push(it);                       // 서버에도 있음 → 리스너가 최신값으로 갱신
+    else if(snapMap[it.id]) { /* 서버에서 삭제됨 → 로컬에서도 제거 */ }
+    else { kept.push(it); upload[it.id] = fbClean(it); }   // 로컬에서 새로 추가된 것 → 업로드
+  });
+  state[key] = kept;
+  Object.keys(remote).forEach(function(id){ snapMap[id] = JSON.stringify(remote[id]); });
+  Object.keys(upload).forEach(function(id){ snapMap[id] = JSON.stringify(upload[id]); });
+  if(Object.keys(upload).length) ref.update(upload);
+}
+
 function reconcileAndWatch(){
   var txRef = fbDb.ref(DB_ROOT + "/transactions");
+  var evRef = fbDb.ref(DB_ROOT + "/events");
   var metaRef = fbDb.ref(DB_ROOT + "/meta");
   setSyncBadge("syncing", "동기화 중…");
 
-  txRef.once("value").then(function(snap){
-    var remote = snap.val() || {};
-    var kept = [], upload = {};
-    (state.transactions || []).forEach(function(t){
-      if(remote[t.id]) { kept.push(t); }                       // 서버에도 있음 → 리스너가 최신값으로 갱신
-      else if(lastSyncedTx[t.id]) { /* 서버에서 삭제됨 → 로컬에서도 제거 */ }
-      else { kept.push(t); upload[t.id] = fbClean(t); }                 // 로컬에서 새로 추가된 건 → 업로드
-    });
-    state.transactions = kept;
-    Object.keys(remote).forEach(function(id){ lastSyncedTx[id] = JSON.stringify(remote[id]); });
-    Object.keys(upload).forEach(function(id){ lastSyncedTx[id] = JSON.stringify(upload[id]); });
+  Promise.all([txRef.once("value"), evRef.once("value")]).then(function(res){
+    reconcileList(res[0].val() || {}, "transactions", lastSyncedTx, txRef);
+    reconcileList(res[1].val() || {}, "events", lastSyncedEv, evRef);
     saveSnapshot();
     persistLocal();
-    if(Object.keys(upload).length) txRef.update(upload);
     return metaRef.once("value");
   }).then(function(msnap){
     var v = msnap.val();
@@ -905,7 +1000,7 @@ function reconcileAndWatch(){
       pushMetaNow();
     }
     metaLoaded = true;
-    startRealtime(txRef, metaRef);
+    startRealtime(txRef, evRef, metaRef);
     render();
     flashBadge("ok", "✓ 동기화됨");
   }).catch(function(e){
@@ -917,45 +1012,47 @@ function reconcileAndWatch(){
 function applyMeta(json){
   try{
     var m = JSON.parse(json);
-    var merged = Object.assign({}, m, { transactions: state.transactions, _savedAt: state._savedAt });
+    var merged = Object.assign({}, m, { transactions: state.transactions, events: state.events, _savedAt: state._savedAt });
     state = loadStateFromObj(merged);
     lastMetaJson = json;
     persistLocal();
   }catch(e){}
 }
 
-function startRealtime(txRef, metaRef){
-  function onTx(snap){
-    var tx = snap.val();
-    if(!tx || !tx.id) return;
-    lastSyncedTx[tx.id] = JSON.stringify(tx);
-    var arr = state.transactions;
-    var idx = -1;
-    for(var i=0;i<arr.length;i++){ if(arr[i].id === tx.id){ idx = i; break; } }
+function watchList(ref, key, snapMap){
+  function onUp(snap){
+    var it = snap.val();
+    if(!it || !it.id) return;
+    snapMap[it.id] = JSON.stringify(it);
+    var arr = state[key], idx = -1, i;
+    for(i=0;i<arr.length;i++){ if(arr[i].id === it.id){ idx = i; break; } }
     if(idx >= 0){
-      if(JSON.stringify(arr[idx]) === JSON.stringify(tx)) return;   // 내가 보낸 값의 메아리 → 무시
-      arr[idx] = tx;
+      if(JSON.stringify(arr[idx]) === JSON.stringify(it)) return;   // 내가 보낸 값의 메아리 → 무시
+      arr[idx] = it;
     } else {
-      arr.push(tx);
+      arr.push(it);
     }
     saveSnapshot();
     scheduleRemoteRender();
   }
-  txRef.on("child_added", onTx);
-  txRef.on("child_changed", onTx);
-  txRef.on("child_removed", function(snap){
-    var id = snap.key;
-    var before = state.transactions.length;
-    state.transactions = state.transactions.filter(function(t){ return t.id !== id; });
-    delete lastSyncedTx[id];
+  ref.on("child_added", onUp);
+  ref.on("child_changed", onUp);
+  ref.on("child_removed", function(snap){
+    var id = snap.key, before = state[key].length;
+    state[key] = state[key].filter(function(x){ return x.id !== id; });
+    delete snapMap[id];
     saveSnapshot();
-    if(state.transactions.length !== before) scheduleRemoteRender();
+    if(state[key].length !== before) scheduleRemoteRender();
   });
+}
 
+function startRealtime(txRef, evRef, metaRef){
+  watchList(txRef, "transactions", lastSyncedTx);
+  watchList(evRef, "events", lastSyncedEv);
   metaRef.on("value", function(snap){
     var v = snap.val();
     if(!v || !v.json) return;
-    if(v.by === DEVICE_ID) { lastMetaJson = v.json; return; }
+    if(v.by === DEVICE_ID){ lastMetaJson = v.json; return; }
     if(v.json === lastMetaJson) return;
     applyMeta(v.json);
     scheduleRemoteRender();
@@ -979,22 +1076,27 @@ function scheduleSyncPush(){
   syncDebounceTimer = setTimeout(pushChanges, 800);
 }
 
+function pushList(ref, key, snapMap){
+  var updates = {}, present = {}, changed = false;
+  (state[key] || []).forEach(function(it){
+    present[it.id] = true;
+    var s = JSON.stringify(it);
+    if(snapMap[it.id] !== s){ updates[it.id] = fbClean(it); snapMap[it.id] = s; changed = true; }
+  });
+  Object.keys(snapMap).forEach(function(id){
+    if(!present[id]){ updates[id] = null; delete snapMap[id]; changed = true; }
+  });
+  return changed ? ref.update(updates) : null;
+}
+
 function pushChanges(){
   if(!fbReady) return;
-  var txRef = fbDb.ref(DB_ROOT + "/transactions");
-  var updates = {}, present = {}, changed = false;
-
-  (state.transactions || []).forEach(function(t){
-    present[t.id] = true;
-    var s = JSON.stringify(t);
-    if(lastSyncedTx[t.id] !== s){ updates[t.id] = fbClean(t); lastSyncedTx[t.id] = s; changed = true; }
-  });
-  Object.keys(lastSyncedTx).forEach(function(id){
-    if(!present[id]){ updates[id] = null; delete lastSyncedTx[id]; changed = true; }
-  });
-
   var jobs = [];
-  if(changed){ saveSnapshot(); jobs.push(txRef.update(updates)); }
+  var jt = pushList(fbDb.ref(DB_ROOT + "/transactions"), "transactions", lastSyncedTx);
+  var je = pushList(fbDb.ref(DB_ROOT + "/events"), "events", lastSyncedEv);
+  if(jt) jobs.push(jt);
+  if(je) jobs.push(je);
+  if(jt || je) saveSnapshot();
 
   var metaJson = JSON.stringify(metaObject());
   if(metaLoaded && metaJson !== lastMetaJson){
@@ -1025,17 +1127,20 @@ function forcePullAll(){
   setSyncBadge("syncing", "불러오는 중…");
   Promise.all([
     fbDb.ref(DB_ROOT + "/transactions").once("value"),
+    fbDb.ref(DB_ROOT + "/events").once("value"),
     fbDb.ref(DB_ROOT + "/meta").once("value")
   ]).then(function(res){
     var remoteTx = res[0].val() || {};
-    var metaVal = res[1].val();
-    var txArr = Object.keys(remoteTx).map(function(k){ return remoteTx[k]; });
+    var remoteEv = res[1].val() || {};
+    var metaVal = res[2].val();
     var base = (metaVal && metaVal.json) ? JSON.parse(metaVal.json) : metaObject();
-    base.transactions = txArr;
+    base.transactions = Object.keys(remoteTx).map(function(k){ return remoteTx[k]; });
+    base.events = Object.keys(remoteEv).map(function(k){ return remoteEv[k]; });
     base._savedAt = (metaVal && metaVal.savedAt) || new Date().toISOString();
     state = loadStateFromObj(base);
-    lastSyncedTx = {};
+    lastSyncedTx = {}; lastSyncedEv = {};
     Object.keys(remoteTx).forEach(function(k){ lastSyncedTx[k] = JSON.stringify(remoteTx[k]); });
+    Object.keys(remoteEv).forEach(function(k){ lastSyncedEv[k] = JSON.stringify(remoteEv[k]); });
     lastMetaJson = (metaVal && metaVal.json) || "";
     saveSnapshot();
     persistLocal();
@@ -1053,15 +1158,18 @@ function forcePushAll(){
   if(!fbReady){ setSyncStatus("Firebase에 연결되지 않았어요."); return; }
   setSyncStatus("서버에 올리는 중…");
   setSyncBadge("syncing", "저장 중…");
-  var map = {};
+  var map = {}, emap = {};
   (state.transactions || []).forEach(function(t){ map[t.id] = fbClean(t); });
+  (state.events || []).forEach(function(e){ emap[e.id] = fbClean(e); });
   var metaJson = JSON.stringify(metaObject());
   Promise.all([
     fbDb.ref(DB_ROOT + "/transactions").set(map),
+    fbDb.ref(DB_ROOT + "/events").set(emap),
     fbDb.ref(DB_ROOT + "/meta").set({ json: metaJson, savedAt: new Date().toISOString(), by: DEVICE_ID })
   ]).then(function(){
-    lastSyncedTx = {};
+    lastSyncedTx = {}; lastSyncedEv = {};
     Object.keys(map).forEach(function(k){ lastSyncedTx[k] = JSON.stringify(map[k]); });
+    Object.keys(emap).forEach(function(k){ lastSyncedEv[k] = JSON.stringify(emap[k]); });
     lastMetaJson = metaJson;
     saveSnapshot();
     setSyncStatus("서버 덮어쓰기 완료 ✓");
@@ -1092,11 +1200,12 @@ var DEFAULT_FIXED = ["보험","구독서비스"];
 var CHART_COLORS = ["#4f46e5","#2563eb","#0891b2","#059669","#d97706","#dc2626","#db2777","#7c3aed","#65a30d","#475569"];
 
 var TABS = [
-  {id:"home", label:"홈", ic:"🏠"},
-  {id:"income", label:"수입내역", ic:"💰"},
-  {id:"category", label:"카테고리별 지출", ic:"📊"},
-  {id:"card", label:"카드별 지출", ic:"💳"},
-  {id:"loan", label:"자금계획", ic:"🏦"}
+  {id:"home", label:"홈", s:"홈", ic:"🏠"},
+  {id:"category", label:"카테고리", s:"카테고리", ic:"📊"},
+  {id:"card", label:"카드별 지출", s:"카드", ic:"💳"},
+  {id:"schedule", label:"일정", s:"일정", ic:"🗓️"},
+  {id:"caldiary", label:"가계부 달력", s:"달력", ic:"📅"},
+  {id:"loan", label:"대출 내역", s:"대출", ic:"🏦"}
 ];
 
 var state = null;
@@ -1111,7 +1220,8 @@ function defaultState(){
     loans: [],
     recurring: [],
     planItems: [],
-    planEvents: {}
+    planEvents: {},
+    events: []
   };
 }
 
@@ -1170,6 +1280,14 @@ function loadState(){
       if(p.mode === "loan" && !p.loanId) p.mode = "manual";
     });
     parsed.planEvents = (parsed.planEvents && typeof parsed.planEvents === "object") ? parsed.planEvents : {};
+    parsed.events = Array.isArray(parsed.events) ? parsed.events : [];
+    parsed.events.forEach(function(e){
+      e.title = typeof e.title === "string" ? e.title : "";
+      e.memo  = typeof e.memo === "string" ? e.memo : "";
+      e.owner = (e.owner === "w" || e.owner === "both") ? e.owner : "h";
+      e.order = Number(e.order) || 0;
+      if(typeof e.endDate !== "string") e.endDate = "";
+    });
     parsed.loans.forEach(migrateLoan);
     parsed.transactions.forEach(function(t){ if(typeof t.account !== "string") t.account = ""; });
     return parsed;
@@ -1212,8 +1330,20 @@ var ui = {
   editingPlanEventMonth: null,
   planItemMode: "manual",
   planRange: null,
-  txType: "expense"
+  txType: "expense",
+  catType: "expense",   // 카테고리 탭에서 보는 종류
+  selDate: null,
+  editingEventId: null,
+  evOwner: "h"
 };
+
+var OWNER_KEY = "kr_cashflow_owner";
+function deviceOwner(){
+  try{ var v = localStorage.getItem(OWNER_KEY); if(v === "h" || v === "w") return v; }catch(e){}
+  return "h";
+}
+function setDeviceOwner(v){ try{ localStorage.setItem(OWNER_KEY, v); }catch(e){} }
+function ownerLabel(o){ return o === "w" ? "아내" : (o === "both" ? "공통" : "남편"); }
 
 var trendChartInst = null;
 var catChartInst = null;
@@ -1273,7 +1403,7 @@ function buildNav(){
 
     var b2 = document.createElement("button");
     b2.className = "navitem"; b2.dataset.tab = t.id;
-    b2.innerHTML = '<span class="ic">'+t.ic+'</span><span>'+t.label+'</span>';
+    b2.innerHTML = '<span class="ic">'+t.ic+'</span><span>'+(t.s || t.label)+'</span>';
     b2.addEventListener("click", function(){ switchTab(t.id); });
     bottomNav.appendChild(b2);
   });
@@ -1291,6 +1421,12 @@ function switchTab(tabId){
   document.getElementById("tabTitle").textContent = tab ? tab.label : "";
   var monthNav = document.getElementById("monthNav");
   monthNav.style.display = (tabId === "loan") ? "none" : "flex";
+  var isCal = (tabId === "schedule" || tabId === "caldiary");
+  document.getElementById("toggleAll").style.display = isCal ? "none" : "";
+  if(isCal){
+    ui.viewMode = "month";
+    if(!ui.selDate || ui.selDate.slice(0,7) !== monthKeyFromDate(ui.viewDate.getFullYear(), ui.viewDate.getMonth())) syncSelDateToMonth();
+  }
   render();
 }
 
@@ -1298,9 +1434,10 @@ function switchTab(tabId){
 function render(){
   renderMonthNav();
   if(ui.activeTab === "home") renderHome();
-  else if(ui.activeTab === "income") renderIncomeTab();
   else if(ui.activeTab === "category") renderCategoryTab();
   else if(ui.activeTab === "card") renderCardTab();
+  else if(ui.activeTab === "schedule") renderScheduleTab();
+  else if(ui.activeTab === "caldiary") renderCalDiaryTab();
   else if(ui.activeTab === "loan") renderLoanTab();
 }
 
@@ -1367,6 +1504,325 @@ function wireTxRowClicks(containerId, list){
       if(tx) openTxModal(tx);
     });
   });
+}
+
+/* ================= 달력 공통 ================= */
+/* 공휴일 표 — 해가 바뀌면 여기에 줄만 추가하면 됩니다. */
+var HOLIDAYS = {
+  "2026-01-01":"신정",
+  "2026-02-16":"설 연휴","2026-02-17":"설날","2026-02-18":"설 연휴",
+  "2026-03-01":"삼일절","2026-03-02":"대체공휴일",
+  "2026-05-05":"어린이날","2026-05-24":"부처님오신날","2026-05-25":"대체공휴일",
+  "2026-06-06":"현충일",
+  "2026-07-17":"제헌절",
+  "2026-08-15":"광복절","2026-08-17":"대체공휴일",
+  "2026-09-24":"추석 연휴","2026-09-25":"추석","2026-09-26":"추석 연휴",
+  "2026-10-03":"개천절","2026-10-05":"대체공휴일","2026-10-09":"한글날",
+  "2026-12-25":"성탄절",
+  "2027-01-01":"신정",
+  "2027-02-06":"설 연휴","2027-02-07":"설날","2027-02-08":"설 연휴","2027-02-09":"대체공휴일",
+  "2027-03-01":"삼일절",
+  "2027-05-05":"어린이날","2027-05-13":"부처님오신날",
+  "2027-06-06":"현충일",
+  "2027-07-17":"제헌절","2027-07-19":"대체공휴일",
+  "2027-08-15":"광복절","2027-08-16":"대체공휴일",
+  "2027-09-14":"추석 연휴","2027-09-15":"추석","2027-09-16":"추석 연휴",
+  "2027-10-03":"개천절","2027-10-04":"대체공휴일","2027-10-09":"한글날","2027-10-11":"대체공휴일",
+  "2027-12-25":"성탄절","2027-12-27":"대체공휴일"
+};
+/* 빨간날은 아니지만 우리는 쉬는 날 */
+var OFFDAYS = {
+  "2026-05-01":"근로자의날",
+  "2027-05-01":"근로자의날"
+};
+var DOW_KR = ["일","월","화","수","목","금","토"];
+
+function isoOf(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+function parseIso(s){ var a = String(s||"").split("-"); return new Date(Number(a[0]), Number(a[1])-1, Number(a[2])); }
+
+function dayLabel(iso){
+  var d = parseIso(iso);
+  var tag = HOLIDAYS[iso] || OFFDAYS[iso];
+  return (d.getMonth()+1)+"월 "+d.getDate()+"일 ("+DOW_KR[d.getDay()]+")"+(tag ? " · "+tag : "");
+}
+
+/* 좁은 달력 칸에 들어갈 짧은 금액 표기 */
+function shortAmt(n){
+  n = Math.round(Number(n)||0);
+  if(n >= 10000){
+    var m = n/10000;
+    return (m >= 100 ? Math.round(m) : Math.round(m*10)/10) + "만";
+  }
+  if(n >= 1000) return (Math.round(n/100)/10) + "천";
+  return String(n);
+}
+
+function monthCells(y, m){
+  var first = new Date(y, m, 1);
+  var start = new Date(y, m, 1 - first.getDay());
+  var cells = [];
+  for(var i=0;i<42;i++) cells.push(new Date(start.getFullYear(), start.getMonth(), start.getDate()+i));
+  if(cells[35].getMonth() !== m) cells = cells.slice(0,35);
+  return cells;
+}
+
+function calendarHtml(y, m, cellRenderer){
+  var today = todayIso();
+  var h = '<div class="calwrap"><div class="calhead">';
+  DOW_KR.forEach(function(d,i){
+    h += '<div class="'+(i===0?"sun":(i===6?"sat":""))+'">'+d+'</div>';
+  });
+  h += '</div><div class="calgrid">';
+  monthCells(y, m).forEach(function(d){
+    var iso = isoOf(d), inMonth = d.getMonth() === m, dow = d.getDay();
+    var hol = HOLIDAYS[iso], off = !hol && OFFDAYS[iso];
+    var cls = "calcell" + (inMonth ? "" : " out") + (iso === today ? " today" : "") + (iso === ui.selDate ? " sel" : "");
+    var ncls = "caldnum" + ((hol || dow === 0) ? " sun" : (dow === 6 ? " sat" : "")) + (off ? " off" : "");
+    var name = "";
+    if(inMonth && hol) name = '<div class="calholname">'+escapeHtml(hol)+'</div>';
+    else if(inMonth && off) name = '<div class="calholname off">'+escapeHtml(off)+'</div>';
+    h += '<div class="'+cls+'" data-cal-date="'+iso+'">'+
+         '<div class="'+ncls+'">'+d.getDate()+'</div>'+ name +
+         cellRenderer(iso, inMonth)+'</div>';
+  });
+  return h + '</div></div>';
+}
+
+/* 달이 바뀌면 선택일도 새 달로 옮긴다 (오늘이 그 달이면 오늘로) */
+function syncSelDateToMonth(){
+  var y = ui.viewDate.getFullYear(), m = ui.viewDate.getMonth(), t = new Date();
+  ui.selDate = (t.getFullYear() === y && t.getMonth() === m) ? todayIso() : isoOf(new Date(y, m, 1));
+}
+
+function wireCalCells(containerId){
+  var c = document.getElementById(containerId);
+  if(!c) return;
+  c.querySelectorAll("[data-cal-date]").forEach(function(cell){
+    cell.addEventListener("click", function(){
+      ui.selDate = cell.dataset.calDate;
+      render();
+    });
+  });
+}
+
+/* ---- 일정 데이터 ---- */
+function eventsOnDate(iso){
+  return state.events.filter(function(e){
+    if(!e.date) return false;
+    if(e.endDate && e.endDate > e.date) return iso >= e.date && iso <= e.endDate;
+    return e.date === iso;
+  }).sort(function(a,b){ return (a.order||0) - (b.order||0); });
+}
+
+/* ================= 일정 탭 ================= */
+function renderScheduleTab(){
+  var y = ui.viewDate.getFullYear(), m = ui.viewDate.getMonth();
+  document.getElementById("scheduleCal").innerHTML = calendarHtml(y, m, function(iso, inMonth){
+    if(!inMonth) return "";
+    var evs = eventsOnDate(iso), h = "";
+    evs.slice(0,3).forEach(function(e){
+      h += '<div class="evbar '+e.owner+'">'+escapeHtml(e.title)+'</div>';
+    });
+    if(evs.length > 3) h += '<div class="evmore">+'+(evs.length-3)+'</div>';
+    return h;
+  });
+  wireCalCells("scheduleCal");
+  renderScheduleDay();
+}
+
+function renderScheduleDay(){
+  var box = document.getElementById("scheduleDay");
+  if(!ui.selDate){
+    box.innerHTML = '<div class="daybox"><div class="empty-state" style="padding:14px 4px;">날짜를 누르면 그날 일정을 볼 수 있어요.</div></div>';
+    return;
+  }
+  var evs = eventsOnDate(ui.selDate);
+  var h = '<div class="daybox"><div class="dayhead"><div class="daytitle">'+escapeHtml(dayLabel(ui.selDate))+'</div>'+
+          '<button class="daybtn" id="btnAddEventDay">+ 일정 추가</button></div>';
+  if(!evs.length){
+    h += '<div class="empty-state" style="padding:14px 4px;">이 날은 일정이 없어요.</div>';
+  } else {
+    h += '<div id="evSortList">';
+    evs.forEach(function(e){
+      var span = (e.endDate && e.endDate > e.date) ? (e.date.slice(5).replace("-",".")+" ~ "+e.endDate.slice(5).replace("-",".")) : "";
+      var sub = [ownerLabel(e.owner), span, e.memo].filter(function(x){ return !!x; }).join(" · ");
+      h += '<div class="evrow" data-evid="'+e.id+'">'+
+           '<div class="grip">⋮⋮</div>'+
+           '<div class="evdot '+e.owner+'"></div>'+
+           '<div class="evbody" data-ev-edit="'+e.id+'"><div class="evttl">'+escapeHtml(e.title)+'</div>'+
+           (sub ? '<div class="evsub">'+escapeHtml(sub)+'</div>' : '')+'</div></div>';
+    });
+    h += '</div>';
+    if(evs.length > 1) h += '<div class="acchint" style="margin-top:8px;">⋮⋮ 손잡이를 끌어서 순서를 바꿀 수 있어요.</div>';
+  }
+  box.innerHTML = h + '</div>';
+
+  var addBtn = document.getElementById("btnAddEventDay");
+  if(addBtn) addBtn.addEventListener("click", function(){ openEventModal(null); });
+  box.querySelectorAll("[data-ev-edit]").forEach(function(el){
+    el.addEventListener("click", function(){
+      var ev = state.events.filter(function(x){ return x.id === el.dataset.evEdit; })[0];
+      if(ev) openEventModal(ev);
+    });
+  });
+  var list = document.getElementById("evSortList");
+  if(list) initDragReorder(list);
+}
+
+/* ---- 끌어서 순서 바꾸기 (마우스/터치 공용) ---- */
+function initDragReorder(container){
+  container.querySelectorAll(".grip").forEach(function(grip){
+    grip.addEventListener("pointerdown", function(e){
+      e.preventDefault();
+      var row = grip.parentNode;
+      row.classList.add("dragging");
+      try{ grip.setPointerCapture(e.pointerId); }catch(_){}
+
+      function move(ev){
+        var y = ev.clientY, sibs = Array.prototype.slice.call(container.children), i;
+        for(i=0;i<sibs.length;i++){
+          if(sibs[i] === row) continue;
+          var r = sibs[i].getBoundingClientRect();
+          if(y < r.top + r.height/2){
+            if(sibs[i].previousSibling !== row) container.insertBefore(row, sibs[i]);
+            return;
+          }
+        }
+        if(container.lastChild !== row) container.appendChild(row);
+      }
+      function up(){
+        row.classList.remove("dragging");
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", up);
+        document.removeEventListener("pointercancel", up);
+        var ids = Array.prototype.slice.call(container.children).map(function(c){ return c.dataset.evid; });
+        applyEventOrder(ids);
+      }
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerup", up);
+      document.addEventListener("pointercancel", up);
+    });
+  });
+}
+
+function applyEventOrder(ids){
+  var changed = false;
+  ids.forEach(function(id, i){
+    var ev = state.events.filter(function(x){ return x.id === id; })[0];
+    if(ev && ev.order !== i){ ev.order = i; changed = true; }
+  });
+  if(changed){ saveState(); render(); }
+}
+
+/* ---- 일정 모달 ---- */
+function setEvOwner(o){
+  ui.evOwner = o;
+  document.querySelectorAll("#evOwnerToggle button").forEach(function(b){
+    b.classList.toggle("active", b.dataset.owner === o);
+  });
+}
+
+function openEventModal(ev){
+  ui.editingEventId = ev ? ev.id : null;
+  document.getElementById("eventModalTitle").textContent = ev ? "일정 수정" : "일정 추가";
+  document.getElementById("fEvTitle").value = ev ? ev.title : "";
+  document.getElementById("fEvDate").value = ev ? ev.date : (ui.selDate || todayIso());
+  document.getElementById("fEvEnd").value = ev ? (ev.endDate || "") : "";
+  document.getElementById("fEvMemo").value = ev ? (ev.memo || "") : "";
+  setEvOwner(ev ? ev.owner : deviceOwner());
+  document.getElementById("btnDeleteEvent").style.display = ev ? "block" : "none";
+  openOverlay("eventOverlay");
+}
+
+function saveEventFromModal(){
+  var title = document.getElementById("fEvTitle").value.trim();
+  if(!title){ showConfirm("입력 필요", "일정 제목을 입력해주세요.", null, true); return; }
+  var date = document.getElementById("fEvDate").value || todayIso();
+  var end = document.getElementById("fEvEnd").value || "";
+  if(end && end < date){ showConfirm("날짜 확인", "종료일이 시작일보다 빠릅니다.", null, true); return; }
+  var data = { title: title, date: date, endDate: end, memo: document.getElementById("fEvMemo").value.trim(), owner: ui.evOwner };
+  if(ui.editingEventId){
+    var idx = state.events.findIndex(function(x){ return x.id === ui.editingEventId; });
+    if(idx > -1) state.events[idx] = Object.assign(state.events[idx], data);
+  } else {
+    var sameDay = eventsOnDate(date);
+    data.id = uid();
+    data.order = sameDay.length ? (Math.max.apply(null, sameDay.map(function(x){ return x.order||0; })) + 1) : 0;
+    state.events.push(data);
+    ui.selDate = date;
+  }
+  saveState();
+  closeOverlay("eventOverlay");
+  render();
+}
+
+function deleteEventFromModal(){
+  if(!ui.editingEventId) return;
+  showConfirm("일정 삭제", "이 일정을 삭제할까요?", function(){
+    state.events = state.events.filter(function(x){ return x.id !== ui.editingEventId; });
+    saveState();
+    closeOverlay("eventOverlay");
+    render();
+  });
+}
+
+/* ================= 가계부 달력 탭 ================= */
+function renderCalDiaryTab(){
+  var y = ui.viewDate.getFullYear(), m = ui.viewDate.getMonth();
+  var byDate = {};
+  state.transactions.forEach(function(t){
+    if(!byDate[t.date]) byDate[t.date] = { inc:0, exp:0 };
+    if(t.type === "income") byDate[t.date].inc += Number(t.amount)||0;
+    else byDate[t.date].exp += Number(t.amount)||0;
+  });
+  var mk = monthKeyFromDate(y, m), inc = 0, exp = 0;
+  Object.keys(byDate).forEach(function(k){
+    if(k.slice(0,7) === mk){ inc += byDate[k].inc; exp += byDate[k].exp; }
+  });
+  document.getElementById("caldiarySummary").innerHTML =
+    scard("이번달 수입", won(inc), "income") +
+    scard("이번달 지출", won(exp), "expense") +
+    scard("순액", (inc-exp >= 0 ? "+" : "")+won(inc-exp), inc-exp >= 0 ? "income" : "expense");
+
+  document.getElementById("caldiaryCal").innerHTML = calendarHtml(y, m, function(iso, inMonth){
+    if(!inMonth) return "";
+    var v = byDate[iso];
+    if(!v) return "";
+    var h = "";
+    if(v.inc) h += '<div class="calamt inc">+'+shortAmt(v.inc)+'</div>';
+    if(v.exp) h += '<div class="calamt exp">-'+shortAmt(v.exp)+'</div>';
+    return h;
+  });
+  wireCalCells("caldiaryCal");
+  renderCalDiaryDay();
+}
+
+function renderCalDiaryDay(){
+  var box = document.getElementById("caldiaryDay");
+  if(!ui.selDate){
+    box.innerHTML = '<div class="daybox"><div class="empty-state" style="padding:14px 4px;">날짜를 누르면 그날 내역을 볼 수 있어요.</div></div>';
+    return;
+  }
+  var list = state.transactions.filter(function(t){ return t.date === ui.selDate; });
+  var tot = periodTotals(list);
+  var sub = [];
+  if(tot.income) sub.push("수입 "+won(tot.income));
+  if(tot.expense) sub.push("지출 "+won(tot.expense));
+  var h = '<div class="daybox"><div class="dayhead"><div><div class="daytitle">'+escapeHtml(dayLabel(ui.selDate))+'</div>'+
+          (sub.length ? '<div class="evsub" style="margin-top:3px;">'+sub.join(" · ")+'</div>' : '')+'</div>'+
+          '<button class="daybtn" id="btnAddTxDay">+ 내역 추가</button></div>';
+  if(!list.length){
+    h += '<div class="empty-state" style="padding:14px 4px;">이 날은 내역이 없어요.</div>';
+  } else {
+    h += '<div id="caldiaryTxList">' + list.map(function(t){ return txRowHtml(t); }).join("") + '</div>';
+  }
+  box.innerHTML = h + '</div>';
+  var addBtn = document.getElementById("btnAddTxDay");
+  if(addBtn) addBtn.addEventListener("click", function(){
+    openTxModal(null);
+    document.getElementById("fDate").value = ui.selDate;
+  });
+  if(list.length) wireTxRowClicks("caldiaryTxList", list);
 }
 
 /* ================= HOME TAB ================= */
@@ -1443,44 +1899,33 @@ function fillSelectOptions(sel, items, keepFirst){
   });
 }
 
-function renderIncomeTab(){
-  var catSel = document.getElementById("incomeCatFilter");
-  fillSelectOptions(catSel, state.categories.income, true);
-  catSel.value = ui.listFilter.income.cat;
-
-  var all = transactionsInPeriod().filter(function(t){ return t.type === "income"; });
-  var tot = periodTotals(all);
-  document.getElementById("incomeSummary").innerHTML =
-    scard((ui.viewMode==="all"?"전체":"이번달")+" 수입 합계", won(tot.income), "income") +
-    scard("건수", all.length+"건", "");
-
-  var f = ui.listFilter.income;
-  var list = all.filter(function(t){
-    if(f.cat && t.category !== f.cat) return false;
-    if(f.q && (t.memo||"").indexOf(f.q) === -1) return false;
-    return true;
-  }).sort(function(a,b){ return b.date.localeCompare(a.date); });
-
-  var box = document.getElementById("incomeList");
-  if(list.length === 0){
-    box.innerHTML = '<div class="empty-state">조건에 맞는 수입 내역이 없어요.</div>';
-  } else {
-    box.innerHTML = list.map(function(t){ return txRowHtml(t); }).join("");
-    wireTxRowClicks("incomeList", list);
-  }
+function setCatType(t){
+  ui.catType = (t === "income") ? "income" : "expense";
+  render();
 }
 
-/* ================= CATEGORY TAB ================= */
 function renderCategoryTab(){
+  var isInc = ui.catType === "income";
+  document.querySelectorAll("#catTypeToggle button").forEach(function(b){
+    b.classList.toggle("active", b.dataset.type === ui.catType);
+  });
+
+  var f = isInc ? ui.listFilter.income : ui.listFilter.category;
   var catSel = document.getElementById("categoryCatFilter");
-  fillSelectOptions(catSel, state.categories.expense, true);
-  catSel.value = ui.listFilter.category.cat;
+  fillSelectOptions(catSel, isInc ? state.categories.income : state.categories.expense, true);
+  catSel.value = f.cat;
+  document.getElementById("categorySearch").value = f.q;
 
-  var allExpense = transactionsInPeriod().filter(function(t){ return t.type === "expense"; });
-  renderCategoryChart(allExpense);
+  var all = transactionsInPeriod().filter(function(t){ return t.type === (isInc ? "income" : "expense"); });
+  var tot = periodTotals(all);
+  document.getElementById("categorySummary").innerHTML =
+    scard((ui.viewMode==="all"?"전체":"이번달")+(isInc?" 수입":" 지출")+" 합계",
+          won(isInc ? tot.income : tot.expense), isInc ? "income" : "expense") +
+    scard("건수", all.length+"건", "");
 
-  var f = ui.listFilter.category;
-  var list = allExpense.filter(function(t){
+  renderCategoryChart(all, isInc);
+
+  var list = all.filter(function(t){
     if(f.cat && t.category !== f.cat) return false;
     if(f.q && (t.memo||"").indexOf(f.q) === -1) return false;
     return true;
@@ -1488,19 +1933,19 @@ function renderCategoryTab(){
 
   var box = document.getElementById("categoryList");
   if(list.length === 0){
-    box.innerHTML = '<div class="empty-state">조건에 맞는 지출 내역이 없어요.</div>';
+    box.innerHTML = '<div class="empty-state">조건에 맞는 '+(isInc?"수입":"지출")+' 내역이 없어요.</div>';
   } else {
     box.innerHTML = list.map(function(t){ return txRowHtml(t); }).join("");
     wireTxRowClicks("categoryList", list);
   }
 }
 
-function renderCategoryChart(expenseList){
+function renderCategoryChart(txList, isInc){
   var titleEl = document.getElementById("catChartTitle");
-  titleEl.textContent = (ui.viewMode==="all"?"전체기간":periodLabel())+" 카테고리별 지출";
+  titleEl.textContent = (ui.viewMode==="all"?"전체기간":periodLabel())+" 카테고리별 "+(isInc?"수입":"지출");
 
   var byCat = {};
-  expenseList.forEach(function(t){
+  txList.forEach(function(t){
     byCat[t.category] = (byCat[t.category]||0) + (Number(t.amount)||0);
   });
   var entries = Object.keys(byCat).map(function(k){ return {name:k, amt:byCat[k]}; }).sort(function(a,b){ return b.amt-a.amt; });
@@ -1512,7 +1957,7 @@ function renderCategoryChart(expenseList){
   if(entries.length === 0){
     box.innerHTML = '<canvas id="catChart"></canvas>';
     if(catChartInst){ catChartInst.destroy(); catChartInst = null; }
-    legend.innerHTML = '<div class="empty-state">지출 내역이 없어요.</div>';
+    legend.innerHTML = '<div class="empty-state">'+(isInc?"수입":"지출")+' 내역이 없어요.</div>';
     return;
   }
 
@@ -2352,8 +2797,8 @@ function openTxModal(tx){
   document.getElementById("newCatRow").classList.remove("show");
   document.getElementById("newCatInput").value = "";
 
-  var lockType = !tx && (ui.activeTab === "income" || ui.activeTab === "category" || ui.activeTab === "card");
-  var defaultType = tx ? tx.type : (ui.activeTab === "income" ? "income" : "expense");
+  var lockType = !tx && (ui.activeTab === "category" || ui.activeTab === "card");
+  var defaultType = tx ? tx.type : ((ui.activeTab === "category" && ui.catType === "income") ? "income" : "expense");
   setTxType(defaultType);
   document.getElementById("txTypeToggle").style.display = (tx || !lockType) ? "flex" : "none";
 
@@ -2483,6 +2928,10 @@ function openSettingsModal(){
   document.querySelectorAll("#catGroupTabs button").forEach(function(b){ b.classList.toggle("active", b.dataset.g === "income"); });
   renderCatManageList();
   renderRecurringManageList();
+  var dOwner = deviceOwner();
+  document.querySelectorAll("#deviceOwnerToggle button").forEach(function(b){
+    b.classList.toggle("active", b.dataset.owner === dOwner);
+  });
   populateSyncSettingsUI();
   openOverlay("settingsOverlay");
 }
@@ -2709,6 +3158,12 @@ function resetAll(){
 /* ================= FAB routing ================= */
 function onFabClick(){
   if(ui.activeTab === "loan"){ openPlanItemModal(null); return; }
+  if(ui.activeTab === "schedule"){ openEventModal(null); return; }
+  if(ui.activeTab === "caldiary"){
+    openTxModal(null);
+    if(ui.selDate) document.getElementById("fDate").value = ui.selDate;
+    return;
+  }
   if(ui.activeTab === "card" && state.accounts.length === 0){
     showConfirm("카드/계좌 필요", "먼저 카드 또는 계좌를 하나 이상 추가해주세요.", null, true);
     return;
@@ -2720,16 +3175,14 @@ function onFabClick(){
 function wireEvents(){
   document.getElementById("btnAdd").addEventListener("click", onFabClick);
 
-  document.getElementById("prevMonth").addEventListener("click", function(){
+  function shiftMonth(delta){
     ui.viewMode = "month";
-    ui.viewDate = new Date(ui.viewDate.getFullYear(), ui.viewDate.getMonth()-1, 1);
+    ui.viewDate = new Date(ui.viewDate.getFullYear(), ui.viewDate.getMonth()+delta, 1);
+    if(ui.activeTab === "schedule" || ui.activeTab === "caldiary") syncSelDateToMonth();
     render();
-  });
-  document.getElementById("nextMonth").addEventListener("click", function(){
-    ui.viewMode = "month";
-    ui.viewDate = new Date(ui.viewDate.getFullYear(), ui.viewDate.getMonth()+1, 1);
-    render();
-  });
+  }
+  document.getElementById("prevMonth").addEventListener("click", function(){ shiftMonth(-1); });
+  document.getElementById("nextMonth").addEventListener("click", function(){ shiftMonth(1); });
   document.getElementById("toggleAll").addEventListener("click", function(){
     ui.viewMode = ui.viewMode === "all" ? "month" : "all";
     render();
@@ -2739,6 +3192,21 @@ function wireEvents(){
   if(badgeEl){ badgeEl.style.cursor = "pointer"; badgeEl.addEventListener("click", openSettingsModal); }
   document.getElementById("btnSettings").addEventListener("click", openSettingsModal);
   document.getElementById("btnSettingsSide").addEventListener("click", openSettingsModal);
+
+  document.getElementById("btnSaveEvent").addEventListener("click", saveEventFromModal);
+  document.getElementById("btnDeleteEvent").addEventListener("click", deleteEventFromModal);
+  document.getElementById("btnCancelEvent").addEventListener("click", function(){ closeOverlay("eventOverlay"); });
+  document.querySelectorAll("#evOwnerToggle button").forEach(function(b){
+    b.addEventListener("click", function(){ setEvOwner(b.dataset.owner); });
+  });
+  document.querySelectorAll("#deviceOwnerToggle button").forEach(function(b){
+    b.addEventListener("click", function(){
+      setDeviceOwner(b.dataset.owner);
+      document.querySelectorAll("#deviceOwnerToggle button").forEach(function(x){
+        x.classList.toggle("active", x.dataset.owner === b.dataset.owner);
+      });
+    });
+  });
 
   document.getElementById("btnSyncConnect").addEventListener("click", function(){
     var url = document.getElementById("syncDbUrl").value.trim();
@@ -2842,14 +3310,19 @@ function wireEvents(){
   document.getElementById("btnSaveAccGoal").addEventListener("click", saveAccGoalFromModal);
   document.getElementById("btnCancelAccGoal").addEventListener("click", function(){ closeOverlay("accGoalOverlay"); });
 
-  document.getElementById("incomeCatFilter").addEventListener("change", function(e){ ui.listFilter.income.cat = e.target.value; render(); });
-  document.getElementById("incomeSearch").addEventListener("input", function(e){ ui.listFilter.income.q = e.target.value; render(); });
-  document.getElementById("categoryCatFilter").addEventListener("change", function(e){ ui.listFilter.category.cat = e.target.value; render(); });
-  document.getElementById("categorySearch").addEventListener("input", function(e){ ui.listFilter.category.q = e.target.value; render(); });
+  document.querySelectorAll("#catTypeToggle button").forEach(function(b){
+    b.addEventListener("click", function(){ setCatType(b.dataset.type); });
+  });
+  document.getElementById("categoryCatFilter").addEventListener("change", function(e){
+    (ui.catType === "income" ? ui.listFilter.income : ui.listFilter.category).cat = e.target.value; render();
+  });
+  document.getElementById("categorySearch").addEventListener("input", function(e){
+    (ui.catType === "income" ? ui.listFilter.income : ui.listFilter.category).q = e.target.value; render();
+  });
   document.getElementById("cardAccFilter").addEventListener("change", function(e){ ui.listFilter.card.acc = e.target.value; render(); });
   document.getElementById("cardCatFilter").addEventListener("change", function(e){ ui.listFilter.card.cat = e.target.value; render(); });
 
-  [["txOverlay","btnCancelTx"],["loanOverlay","btnCancelLoan"],["settingsOverlay","btnCloseSettings"],["accGoalOverlay","btnCancelAccGoal"],["planItemOverlay","btnCancelPlanItem"],["planCellOverlay","btnCancelPlanCell"],["planEventOverlay","btnCancelPlanEvent"]].forEach(function(pair){
+  [["txOverlay","btnCancelTx"],["loanOverlay","btnCancelLoan"],["settingsOverlay","btnCloseSettings"],["accGoalOverlay","btnCancelAccGoal"],["planItemOverlay","btnCancelPlanItem"],["planCellOverlay","btnCancelPlanCell"],["planEventOverlay","btnCancelPlanEvent"],["eventOverlay","btnCancelEvent"]].forEach(function(pair){
     document.getElementById(pair[0]).addEventListener("click", function(e){
       if(e.target.id === pair[0]) closeOverlay(pair[0]);
     });
@@ -2873,7 +3346,7 @@ if(document.readyState === "loading"){
   init();
 }
 
-window.__cfDashboard = { getState: function(){ return state; }, seedSampleData: seedSampleData, render: render, switchTab: switchTab, materializeRecurring: materializeRecurring, buildAmortizationSchedule: buildAmortizationSchedule, prepaymentsByMonthIndex: prepaymentsByMonthIndex, computeSegmentRows: computeSegmentRows, syncInfo: function(){ return { ready: fbReady, deviceId: DEVICE_ID, root: DB_ROOT }; }, forcePullAll: forcePullAll, forcePushAll: forcePushAll, openSettingsModal: openSettingsModal };
+window.__cfDashboard = { getState: function(){ return state; }, seedSampleData: seedSampleData, render: render, switchTab: switchTab, materializeRecurring: materializeRecurring, buildAmortizationSchedule: buildAmortizationSchedule, prepaymentsByMonthIndex: prepaymentsByMonthIndex, computeSegmentRows: computeSegmentRows, applyEventOrder: applyEventOrder, openEventModal: openEventModal, syncInfo: function(){ return { ready: fbReady, deviceId: DEVICE_ID, root: DB_ROOT }; }, forcePullAll: forcePullAll, forcePushAll: forcePushAll, openSettingsModal: openSettingsModal };
 
 })();
 </script>
