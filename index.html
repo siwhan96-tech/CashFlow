@@ -12,6 +12,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>현금흐름 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
 :root{
   color-scheme: light;
@@ -330,7 +332,7 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 .sync-badge.ok{background:#dcfce7;color:#166534;}
 .sync-badge.err{background:#fee2e2;color:#dc2626;}
 .sync-badge.conflict{background:#fef9c3;color:#854d0e;}
-.gist-status{font-size:12px;color:var(--text-dim);margin-bottom:10px;min-height:16px;}
+.sync-status{font-size:12px;color:var(--text-dim);margin-bottom:10px;min-height:16px;}
 
 @media (max-width:759px){
   .sidebar{display:none;}
@@ -685,23 +687,20 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
       <label>시작 잔액</label>
       <input type="number" id="startBalanceInput" placeholder="0" inputmode="numeric">
     </div>
-    <div class="sectiontitle">☁️ GitHub Gist 동기화</div>
-    <div id="gistSyncStatus" class="gist-status"></div>
+    <div class="sectiontitle">☁️ 실시간 동기화 (Firebase)</div>
+    <div id="syncStatusText" class="sync-status"></div>
     <div class="field">
-      <label>GitHub Personal Access Token</label>
-      <input type="password" id="gistToken" placeholder="ghp_xxxxxxxxxxxxxxxx" autocomplete="off">
+      <label>Firebase 주소 <span style="font-weight:400;color:var(--text-dim);">(Realtime Database 화면 상단 주소)</span></label>
+      <input type="text" id="syncDbUrl" placeholder="https://프로젝트이름-default-rtdb.asia-southeast1.firebasedatabase.app" autocomplete="off" spellcheck="false">
     </div>
-    <div class="field" id="gistIdField">
-      <label>Gist ID <span style="font-weight:400;color:var(--text-dim);">(처음엔 비워두면 자동 생성)</span></label>
-      <input type="text" id="gistId" placeholder="자동 생성됩니다" autocomplete="off">
+    <div class="setactions" style="margin-bottom:8px;">
+      <button class="btn-primary" id="btnSyncConnect" style="flex:1;">연결하기</button>
     </div>
     <div class="setactions" style="margin-bottom:0;">
-      <button id="btnGistSave">연결 저장</button>
-      <button id="btnGistPull">Gist에서 불러오기</button>
-      <button id="btnGistPush">Gist에 저장</button>
-      <button class="danger" id="btnGistDisconnect">연결 해제</button>
+      <button id="btnSyncPull">서버에서 다시 불러오기</button>
+      <button id="btnSyncPush">이 기기 데이터로 서버 덮어쓰기</button>
     </div>
-    <div class="acchint" style="margin:10px 0 4px;">토큰은 이 기기의 브라우저에만 저장되며 외부로 전송되지 않아요. <a href="https://github.com/settings/tokens/new?description=cashflow-dashboard&scopes=gist" target="_blank" rel="noopener" style="color:var(--primary);">GitHub에서 토큰 발급하기 →</a></div>
+    <div class="acchint" style="margin:10px 0 4px;">저장하면 1~2초 안에 다른 기기에 자동 반영돼요. 거래 내역은 항목별로 따로 동기화되기 때문에 둘이 동시에 입력해도 서로 덮어쓰지 않아요.</div>
     <div class="sectiontitle">카테고리 관리</div>
     <div class="settabs" id="catGroupTabs">
       <button data-g="income" class="active">수입 카테고리</button>
@@ -745,25 +744,59 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 "use strict";
 
 var STORAGE_KEY = "kr_cashflow_dashboard_v2";
-var GIST_CONFIG_KEY = "kr_cashflow_gist_config";
-var GIST_FILENAME = "cashflow-dashboard-data.json";
+/* =========================================================
+   FIREBASE 접속 주소
+   여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
+   ========================================================= */
+var FIREBASE_DB_URL = "https://cashflow-2d5a6-default-rtdb.asia-southeast1.firebasedatabase.app";
+var DB_ROOT = "cashflow";
+/* ===== 설정 끝 — 아래는 손대지 마세요 ===== */
 
-/* ===== GITHUB GIST SYNC ===== */
-var gistConfig = null;      // { token, gistId } or null
+var SNAPSHOT_KEY = "kr_cashflow_sync_snapshot";
+var DBURL_KEY    = "kr_cashflow_db_url";
+var DEVICE_KEY   = "kr_cashflow_device_id";
+
+/* ===== FIREBASE REALTIME DB SYNC =====
+   구조:
+     /cashflow/transactions/{id}  — 거래 1건 = 노드 1개 (항목별 동기화 → 동시 입력 충돌 없음)
+     /cashflow/meta               — 그 외 설정(카테고리/카드/대출/자금계획)을 JSON 문자열로 보관
+*/
+var fbDb = null;
+var fbReady = false;
 var syncDebounceTimer = null;
-var isSyncing = false;
+var remoteRenderTimer = null;
+var lastSyncedTx = {};      // { txId: JSON 문자열 } — 서버와 마지막으로 맞춘 상태
+var lastMetaJson = "";
+var metaLoaded = false;
 
-function loadGistConfig(){
-  try {
-    var raw = localStorage.getItem(GIST_CONFIG_KEY);
-    gistConfig = raw ? JSON.parse(raw) : null;
-  } catch(e) { gistConfig = null; }
+var DEVICE_ID = (function(){
+  try{
+    var v = localStorage.getItem(DEVICE_KEY);
+    if(!v){ v = Math.random().toString(36).slice(2,10); localStorage.setItem(DEVICE_KEY, v); }
+    return v;
+  }catch(e){ return "tmp"+Math.random().toString(36).slice(2,8); }
+})();
+
+var META_KEYS = ["startingBalance","categories","fixedCategories","accounts","loans","recurring","planItems","planEvents"];
+
+function fbClean(o){ try{ return JSON.parse(JSON.stringify(o)); }catch(e){ return o; } }
+
+function metaObject(){
+  var m = {};
+  META_KEYS.forEach(function(k){ m[k] = state[k]; });
+  return m;
 }
 
-function saveGistConfig(cfg){
-  gistConfig = cfg;
-  if(cfg) localStorage.setItem(GIST_CONFIG_KEY, JSON.stringify(cfg));
-  else localStorage.removeItem(GIST_CONFIG_KEY);
+function persistLocal(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+function loadSnapshot(){
+  try{ lastSyncedTx = JSON.parse(localStorage.getItem(SNAPSHOT_KEY)) || {}; }
+  catch(e){ lastSyncedTx = {}; }
+}
+function saveSnapshot(){
+  try{ localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(lastSyncedTx)); }catch(e){}
 }
 
 function setSyncBadge(status, text){
@@ -774,130 +807,283 @@ function setSyncBadge(status, text){
   badge.className = "sync-badge " + status;
   badge.textContent = text;
 }
-
-function setGistStatus(text){
-  var el = document.getElementById("gistSyncStatus");
+function flashBadge(status, text, ms){
+  setSyncBadge(status, text);
+  setTimeout(function(){ setSyncBadge(null); }, ms || 2500);
+}
+function setSyncStatus(text){
+  var el = document.getElementById("syncStatusText");
   if(el) el.textContent = text;
 }
 
-// Fetch the current Gist content from GitHub API.
-// Returns { data: parsedJson, etag: string } or null on error.
-async function gistFetch(){
-  if(!gistConfig || !gistConfig.token || !gistConfig.gistId) return null;
-  try {
-    var resp = await fetch("https://api.github.com/gists/"+gistConfig.gistId, {
-      headers: { "Authorization": "token "+gistConfig.token, "Accept": "application/vnd.github.v3+json" }
-    });
-    if(!resp.ok) return null;
-    var json = await resp.json();
-    var file = json.files && json.files[GIST_FILENAME];
-    if(!file) return null;
-    return { data: JSON.parse(file.content), updatedAt: json.updated_at };
-  } catch(e) { return null; }
+function getDbUrl(){
+  try{
+    var v = localStorage.getItem(DBURL_KEY);
+    if(v && v.indexOf("http") === 0) return v.replace(/\/+$/, "");
+  }catch(e){}
+  return (FIREBASE_DB_URL && FIREBASE_DB_URL.indexOf("http") === 0) ? FIREBASE_DB_URL.replace(/\/+$/, "") : "";
 }
-
-// Push current state to Gist. Creates the Gist if gistId is not set yet.
-async function gistPush(){
-  if(!gistConfig || !gistConfig.token) return false;
-  var payload = JSON.stringify(Object.assign({}, state, { _savedAt: new Date().toISOString() }));
-  try {
-    var resp, json;
-    if(gistConfig.gistId){
-      resp = await fetch("https://api.github.com/gists/"+gistConfig.gistId, {
-        method: "PATCH",
-        headers: { "Authorization": "token "+gistConfig.token, "Content-Type": "application/json" },
-        body: JSON.stringify({ files: { [GIST_FILENAME]: { content: payload } } })
-      });
-    } else {
-      resp = await fetch("https://api.github.com/gists", {
-        method: "POST",
-        headers: { "Authorization": "token "+gistConfig.token, "Content-Type": "application/json" },
-        body: JSON.stringify({ description: "cashflow-dashboard 데이터", public: false, files: { [GIST_FILENAME]: { content: payload } } })
-      });
-    }
-    if(!resp.ok) return false;
-    json = await resp.json();
-    if(!gistConfig.gistId){
-      saveGistConfig({ token: gistConfig.token, gistId: json.id });
-      var el = document.getElementById("gistId");
-      if(el) el.value = json.id;
-    }
-    return true;
-  } catch(e) { return false; }
+function saveDbUrl(url){
+  try{ localStorage.setItem(DBURL_KEY, url); }catch(e){}
 }
+function configMissing(){ return !getDbUrl(); }
 
-// Called on every saveState(). Debounces actual Gist push by 2s to avoid hammering API.
-function scheduleSyncPush(){
-  if(!gistConfig || !gistConfig.token) return;
-  setSyncBadge("syncing", "저장 중…");
-  if(syncDebounceTimer) clearTimeout(syncDebounceTimer);
-  syncDebounceTimer = setTimeout(async function(){
-    if(isSyncing) return;
-    isSyncing = true;
-    var ok = await gistPush();
-    isSyncing = false;
-    if(ok){
-      setSyncBadge("ok", "✓ 동기화됨");
-      setTimeout(function(){ setSyncBadge(null); }, 3000);
-    } else {
-      setSyncBadge("err", "⚠ 저장 실패");
-      setGistStatus("Gist 저장 실패 — 토큰/네트워크를 확인해주세요.");
-    }
-  }, 2000);
-}
-
-// Pull from Gist on app startup. If remote data is newer, apply it.
-async function syncOnStartup(){
-  if(!gistConfig || !gistConfig.token || !gistConfig.gistId) return;
-  setSyncBadge("syncing", "동기화 중…");
-  var remote = await gistFetch();
-  if(!remote){ setSyncBadge("err", "⚠ 연결 실패"); setTimeout(function(){ setSyncBadge(null); }, 4000); return; }
-  var remoteTime = remote.data._savedAt ? new Date(remote.data._savedAt) : new Date(0);
-  var localTime = state._savedAt ? new Date(state._savedAt) : new Date(0);
-  if(remoteTime > localTime){
-    // Remote is newer: apply it.
-    delete remote.data._savedAt;
-    state = loadStateFromObj(remote.data);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    render();
-    setSyncBadge("ok", "✓ 최신 데이터 불러옴");
-    setTimeout(function(){ setSyncBadge(null); }, 3000);
-  } else {
-    setSyncBadge("ok", "✓ 동기화됨");
-    setTimeout(function(){ setSyncBadge(null); }, 2000);
-  }
-}
-
-// Parse/migrate a raw object into a valid state (reuses loadState's migration logic).
+/* 상태 정규화: 임의 객체를 loadState()의 마이그레이션 로직을 거쳐 안전한 state로 변환 */
 function loadStateFromObj(obj){
   try {
     var raw = JSON.stringify(obj);
-    localStorage.setItem(STORAGE_KEY+"_tmp", raw);
     var saved = localStorage.getItem(STORAGE_KEY);
     localStorage.setItem(STORAGE_KEY, raw);
     var result = loadState();
     if(saved !== null) localStorage.setItem(STORAGE_KEY, saved);
     else localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(STORAGE_KEY+"_tmp");
     return result;
   } catch(e) { return loadState(); }
 }
 
-// Open settings and populate Gist fields.
-function populateGistSettingsUI(){
-  var tokenEl = document.getElementById("gistToken");
-  var gistIdEl = document.getElementById("gistId");
-  if(!tokenEl || !gistIdEl) return;
-  if(gistConfig){
-    tokenEl.value = gistConfig.token || "";
-    gistIdEl.value = gistConfig.gistId || "";
-    setGistStatus(gistConfig.gistId ? "연결됨 · Gist ID: "+gistConfig.gistId : "토큰 저장됨 — 처음 저장 시 Gist가 자동 생성돼요.");
+function firebaseInit(){
+  loadSnapshot();
+  if(configMissing()){
+    setSyncStatus("아래 칸에 Firebase 주소를 붙여넣고 [연결하기]를 누르세요.");
+    setSyncBadge("err", "⚠ 동기화 설정 필요");
+    return;
+  }
+  if(typeof firebase === "undefined" || !firebase.initializeApp){
+    setSyncStatus("Firebase SDK를 불러오지 못했어요. 네트워크를 확인해주세요.");
+    flashBadge("err", "⚠ SDK 없음", 4000);
+    return;
+  }
+  try{
+    if(!firebase.apps || !firebase.apps.length) firebase.initializeApp({ databaseURL: getDbUrl() });
+    fbDb = firebase.database();
+  }catch(e){
+    setSyncStatus("초기화 실패 — 주소를 다시 확인해주세요.");
+    flashBadge("err", "⚠ 연결 실패", 4000);
+    return;
+  }
+  fbReady = true;
+
+  try{
+    fbDb.ref(".info/connected").on("value", function(s){
+      if(s.val() === true){ setSyncStatus("연결됨 · 실시간 동기화 중"); }
+      else { setSyncStatus("오프라인 — 다시 연결되면 자동으로 동기화돼요"); }
+    });
+  }catch(e){}
+
+  reconcileAndWatch();
+}
+
+/* 시작 시: 서버 ↔ 로컬 차이를 정리한 뒤 실시간 리스너 부착 */
+function reconcileAndWatch(){
+  var txRef = fbDb.ref(DB_ROOT + "/transactions");
+  var metaRef = fbDb.ref(DB_ROOT + "/meta");
+  setSyncBadge("syncing", "동기화 중…");
+
+  txRef.once("value").then(function(snap){
+    var remote = snap.val() || {};
+    var kept = [], upload = {};
+    (state.transactions || []).forEach(function(t){
+      if(remote[t.id]) { kept.push(t); }                       // 서버에도 있음 → 리스너가 최신값으로 갱신
+      else if(lastSyncedTx[t.id]) { /* 서버에서 삭제됨 → 로컬에서도 제거 */ }
+      else { kept.push(t); upload[t.id] = fbClean(t); }                 // 로컬에서 새로 추가된 건 → 업로드
+    });
+    state.transactions = kept;
+    Object.keys(remote).forEach(function(id){ lastSyncedTx[id] = JSON.stringify(remote[id]); });
+    Object.keys(upload).forEach(function(id){ lastSyncedTx[id] = JSON.stringify(upload[id]); });
+    saveSnapshot();
+    persistLocal();
+    if(Object.keys(upload).length) txRef.update(upload);
+    return metaRef.once("value");
+  }).then(function(msnap){
+    var v = msnap.val();
+    if(v && v.json){
+      var remoteAt = v.savedAt || "";
+      var localAt = state._savedAt || "";
+      if(remoteAt >= localAt){ applyMeta(v.json); }
+      else { pushMetaNow(); }
+    } else {
+      pushMetaNow();
+    }
+    metaLoaded = true;
+    startRealtime(txRef, metaRef);
+    render();
+    flashBadge("ok", "✓ 동기화됨");
+  }).catch(function(e){
+    setSyncStatus("서버 연결 실패 — 주소가 맞는지, 규칙이 읽기/쓰기 허용인지 확인해주세요.");
+    flashBadge("err", "⚠ 연결 실패", 5000);
+  });
+}
+
+function applyMeta(json){
+  try{
+    var m = JSON.parse(json);
+    var merged = Object.assign({}, m, { transactions: state.transactions, _savedAt: state._savedAt });
+    state = loadStateFromObj(merged);
+    lastMetaJson = json;
+    persistLocal();
+  }catch(e){}
+}
+
+function startRealtime(txRef, metaRef){
+  function onTx(snap){
+    var tx = snap.val();
+    if(!tx || !tx.id) return;
+    lastSyncedTx[tx.id] = JSON.stringify(tx);
+    var arr = state.transactions;
+    var idx = -1;
+    for(var i=0;i<arr.length;i++){ if(arr[i].id === tx.id){ idx = i; break; } }
+    if(idx >= 0){
+      if(JSON.stringify(arr[idx]) === JSON.stringify(tx)) return;   // 내가 보낸 값의 메아리 → 무시
+      arr[idx] = tx;
+    } else {
+      arr.push(tx);
+    }
+    saveSnapshot();
+    scheduleRemoteRender();
+  }
+  txRef.on("child_added", onTx);
+  txRef.on("child_changed", onTx);
+  txRef.on("child_removed", function(snap){
+    var id = snap.key;
+    var before = state.transactions.length;
+    state.transactions = state.transactions.filter(function(t){ return t.id !== id; });
+    delete lastSyncedTx[id];
+    saveSnapshot();
+    if(state.transactions.length !== before) scheduleRemoteRender();
+  });
+
+  metaRef.on("value", function(snap){
+    var v = snap.val();
+    if(!v || !v.json) return;
+    if(v.by === DEVICE_ID) { lastMetaJson = v.json; return; }
+    if(v.json === lastMetaJson) return;
+    applyMeta(v.json);
+    scheduleRemoteRender();
+  });
+}
+
+function scheduleRemoteRender(){
+  if(remoteRenderTimer) clearTimeout(remoteRenderTimer);
+  remoteRenderTimer = setTimeout(function(){
+    persistLocal();
+    render();
+    flashBadge("ok", "✓ 최신 데이터 반영됨");
+  }, 250);
+}
+
+/* saveState()에서 호출 — 0.8초 debounce 후 변경분만 전송 */
+function scheduleSyncPush(){
+  if(!fbReady) return;
+  setSyncBadge("syncing", "저장 중…");
+  if(syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(pushChanges, 800);
+}
+
+function pushChanges(){
+  if(!fbReady) return;
+  var txRef = fbDb.ref(DB_ROOT + "/transactions");
+  var updates = {}, present = {}, changed = false;
+
+  (state.transactions || []).forEach(function(t){
+    present[t.id] = true;
+    var s = JSON.stringify(t);
+    if(lastSyncedTx[t.id] !== s){ updates[t.id] = fbClean(t); lastSyncedTx[t.id] = s; changed = true; }
+  });
+  Object.keys(lastSyncedTx).forEach(function(id){
+    if(!present[id]){ updates[id] = null; delete lastSyncedTx[id]; changed = true; }
+  });
+
+  var jobs = [];
+  if(changed){ saveSnapshot(); jobs.push(txRef.update(updates)); }
+
+  var metaJson = JSON.stringify(metaObject());
+  if(metaLoaded && metaJson !== lastMetaJson){
+    lastMetaJson = metaJson;
+    jobs.push(fbDb.ref(DB_ROOT + "/meta").set({ json: metaJson, savedAt: new Date().toISOString(), by: DEVICE_ID }));
+  }
+
+  if(!jobs.length){ setSyncBadge(null); return; }
+  Promise.all(jobs).then(function(){
+    flashBadge("ok", "✓ 동기화됨");
+  }).catch(function(){
+    setSyncBadge("err", "⚠ 저장 실패");
+    setSyncStatus("서버 저장 실패 — 네트워크나 데이터베이스 규칙을 확인해주세요.");
+  });
+}
+
+function pushMetaNow(){
+  if(!fbReady) return;
+  var metaJson = JSON.stringify(metaObject());
+  lastMetaJson = metaJson;
+  fbDb.ref(DB_ROOT + "/meta").set({ json: metaJson, savedAt: new Date().toISOString(), by: DEVICE_ID });
+}
+
+/* 설정 모달: 서버 데이터로 전체 교체 */
+function forcePullAll(){
+  if(!fbReady){ setSyncStatus("Firebase에 연결되지 않았어요."); return; }
+  setSyncStatus("서버에서 불러오는 중…");
+  setSyncBadge("syncing", "불러오는 중…");
+  Promise.all([
+    fbDb.ref(DB_ROOT + "/transactions").once("value"),
+    fbDb.ref(DB_ROOT + "/meta").once("value")
+  ]).then(function(res){
+    var remoteTx = res[0].val() || {};
+    var metaVal = res[1].val();
+    var txArr = Object.keys(remoteTx).map(function(k){ return remoteTx[k]; });
+    var base = (metaVal && metaVal.json) ? JSON.parse(metaVal.json) : metaObject();
+    base.transactions = txArr;
+    base._savedAt = (metaVal && metaVal.savedAt) || new Date().toISOString();
+    state = loadStateFromObj(base);
+    lastSyncedTx = {};
+    Object.keys(remoteTx).forEach(function(k){ lastSyncedTx[k] = JSON.stringify(remoteTx[k]); });
+    lastMetaJson = (metaVal && metaVal.json) || "";
+    saveSnapshot();
+    persistLocal();
+    render();
+    setSyncStatus("불러오기 완료 ✓");
+    flashBadge("ok", "✓ 불러옴");
+  }).catch(function(){
+    setSyncStatus("불러오기 실패 — 연결을 확인해주세요.");
+    setSyncBadge("err", "⚠ 불러오기 실패");
+  });
+}
+
+/* 설정 모달: 이 기기 데이터로 서버 전체 덮어쓰기 */
+function forcePushAll(){
+  if(!fbReady){ setSyncStatus("Firebase에 연결되지 않았어요."); return; }
+  setSyncStatus("서버에 올리는 중…");
+  setSyncBadge("syncing", "저장 중…");
+  var map = {};
+  (state.transactions || []).forEach(function(t){ map[t.id] = fbClean(t); });
+  var metaJson = JSON.stringify(metaObject());
+  Promise.all([
+    fbDb.ref(DB_ROOT + "/transactions").set(map),
+    fbDb.ref(DB_ROOT + "/meta").set({ json: metaJson, savedAt: new Date().toISOString(), by: DEVICE_ID })
+  ]).then(function(){
+    lastSyncedTx = {};
+    Object.keys(map).forEach(function(k){ lastSyncedTx[k] = JSON.stringify(map[k]); });
+    lastMetaJson = metaJson;
+    saveSnapshot();
+    setSyncStatus("서버 덮어쓰기 완료 ✓");
+    flashBadge("ok", "✓ 동기화됨");
+  }).catch(function(){
+    setSyncStatus("저장 실패 — 데이터베이스 규칙을 확인해주세요.");
+    setSyncBadge("err", "⚠ 저장 실패");
+  });
+}
+
+function populateSyncSettingsUI(){
+  var inp = document.getElementById("syncDbUrl");
+  if(inp) inp.value = getDbUrl();
+  if(configMissing()){
+    setSyncStatus("아직 연결되지 않았어요. 아래 칸에 Firebase 주소를 붙여넣고 [연결하기]를 누르세요.");
+  } else if(fbReady){
+    setSyncStatus("연결됨 · 실시간 동기화 중");
   } else {
-    tokenEl.value = "";
-    gistIdEl.value = "";
-    setGistStatus("연결되지 않음");
+    setSyncStatus("연결 시도 중…");
   }
 }
+
 var DEFAULT_CATEGORIES = {
   income: ["급여","부수입","용돈","이자/배당","기타수입"],
   expense: ["식비","교통","쇼핑","문화/여가","의료/건강","주거/관리비","보험","구독서비스","교육","기타지출"]
@@ -2297,7 +2483,7 @@ function openSettingsModal(){
   document.querySelectorAll("#catGroupTabs button").forEach(function(b){ b.classList.toggle("active", b.dataset.g === "income"); });
   renderCatManageList();
   renderRecurringManageList();
-  populateGistSettingsUI();
+  populateSyncSettingsUI();
   openOverlay("settingsOverlay");
 }
 
@@ -2549,60 +2735,30 @@ function wireEvents(){
     render();
   });
 
+  var badgeEl = document.getElementById("syncBadge");
+  if(badgeEl){ badgeEl.style.cursor = "pointer"; badgeEl.addEventListener("click", openSettingsModal); }
   document.getElementById("btnSettings").addEventListener("click", openSettingsModal);
   document.getElementById("btnSettingsSide").addEventListener("click", openSettingsModal);
 
-  document.getElementById("btnGistSave").addEventListener("click", async function(){
-    var token = document.getElementById("gistToken").value.trim();
-    var gistId = document.getElementById("gistId").value.trim();
-    if(!token){ setGistStatus("토큰을 입력해주세요."); return; }
-    saveGistConfig({ token: token, gistId: gistId || "" });
-    setGistStatus("저장 중…");
-    setSyncBadge("syncing", "저장 중…");
-    var ok = await gistPush();
-    if(ok){
-      setGistStatus("연결됨 · Gist ID: "+gistConfig.gistId);
-      document.getElementById("gistId").value = gistConfig.gistId;
-      setSyncBadge("ok", "✓ 동기화됨");
-      setTimeout(function(){ setSyncBadge(null); }, 3000);
-    } else {
-      setGistStatus("연결 실패 — 토큰을 확인해주세요.");
-      setSyncBadge("err", "⚠ 저장 실패");
+  document.getElementById("btnSyncConnect").addEventListener("click", function(){
+    var url = document.getElementById("syncDbUrl").value.trim();
+    if(url.indexOf("http") !== 0){
+      setSyncStatus("주소는 https:// 로 시작해야 해요.");
+      return;
     }
+    saveDbUrl(url.replace(/\/+$/, ""));
+    setSyncStatus("연결 중… 잠시 후 화면이 새로고침돼요.");
+    setTimeout(function(){ location.reload(); }, 400);
   });
 
-  document.getElementById("btnGistPush").addEventListener("click", async function(){
-    if(!gistConfig || !gistConfig.token){ setGistStatus("먼저 토큰을 저장해주세요."); return; }
-    setGistStatus("Gist에 저장 중…");
-    setSyncBadge("syncing", "저장 중…");
-    var ok = await gistPush();
-    setGistStatus(ok ? "저장 완료 ✓" : "저장 실패 — 토큰/네트워크를 확인해주세요.");
-    setSyncBadge(ok ? "ok" : "err", ok ? "✓ 동기화됨" : "⚠ 저장 실패");
-    if(ok) setTimeout(function(){ setSyncBadge(null); }, 3000);
+  document.getElementById("btnSyncPull").addEventListener("click", function(){
+    showConfirm("서버에서 불러오기", "서버의 데이터로 이 기기를 맞춥니다. 이 기기에만 있는 미전송 변경은 사라질 수 있어요. 계속할까요?", forcePullAll);
   });
 
-  document.getElementById("btnGistPull").addEventListener("click", async function(){
-    if(!gistConfig || !gistConfig.token || !gistConfig.gistId){ setGistStatus("먼저 토큰과 Gist ID를 저장해주세요."); return; }
-    setGistStatus("Gist에서 불러오는 중…");
-    setSyncBadge("syncing", "불러오는 중…");
-    var remote = await gistFetch();
-    if(!remote){ setGistStatus("불러오기 실패 — 토큰/Gist ID를 확인해주세요."); setSyncBadge("err", "⚠ 불러오기 실패"); return; }
-    delete remote.data._savedAt;
-    state = loadStateFromObj(remote.data);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    render();
-    setGistStatus("불러오기 완료 ✓");
-    setSyncBadge("ok", "✓ 불러옴");
-    setTimeout(function(){ setSyncBadge(null); }, 3000);
+  document.getElementById("btnSyncPush").addEventListener("click", function(){
+    showConfirm("서버 덮어쓰기", "이 기기의 데이터로 서버를 통째 덮어씁니다. 다른 기기에서 입력한 내역 중 이 기기에 없는 건 사라져요. 계속할까요?", forcePushAll);
   });
 
-  document.getElementById("btnGistDisconnect").addEventListener("click", function(){
-    showConfirm("연결 해제", "이 기기에서 Gist 동기화 연결을 해제할까요? 데이터는 삭제되지 않아요.", function(){
-      saveGistConfig(null);
-      populateGistSettingsUI();
-      setSyncBadge(null);
-    });
-  });
   document.getElementById("btnCloseSettings").addEventListener("click", function(){ closeOverlay("settingsOverlay"); });
 
   document.querySelectorAll("#catGroupTabs button").forEach(function(b){
@@ -2702,14 +2858,13 @@ function wireEvents(){
 
 /* ================= Init ================= */
 function init(){
-  loadGistConfig();
   state = loadState();
   materializeRecurring();
   buildNav();
   wireEvents();
   switchTab("home");
-  // Gist startup sync — runs after first render so UI is already visible.
-  setTimeout(syncOnStartup, 500);
+  // Firebase 연결 — 첫 렌더링 이후에 시작해서 화면이 먼저 뜼도록 함
+  setTimeout(firebaseInit, 300);
 }
 
 if(document.readyState === "loading"){
@@ -2718,7 +2873,7 @@ if(document.readyState === "loading"){
   init();
 }
 
-window.__cfDashboard = { getState: function(){ return state; }, seedSampleData: seedSampleData, render: render, switchTab: switchTab, materializeRecurring: materializeRecurring, buildAmortizationSchedule: buildAmortizationSchedule, prepaymentsByMonthIndex: prepaymentsByMonthIndex, computeSegmentRows: computeSegmentRows, getGistConfig: function(){ return gistConfig; }, openSettingsModal: openSettingsModal };
+window.__cfDashboard = { getState: function(){ return state; }, seedSampleData: seedSampleData, render: render, switchTab: switchTab, materializeRecurring: materializeRecurring, buildAmortizationSchedule: buildAmortizationSchedule, prepaymentsByMonthIndex: prepaymentsByMonthIndex, computeSegmentRows: computeSegmentRows, syncInfo: function(){ return { ready: fbReady, deviceId: DEVICE_ID, root: DB_ROOT }; }, forcePullAll: forcePullAll, forcePushAll: forcePushAll, openSettingsModal: openSettingsModal };
 
 })();
 </script>
