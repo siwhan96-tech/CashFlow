@@ -1032,6 +1032,7 @@ function reconcileAndWatch(){
       pushMetaNow();
     }
     metaLoaded = true;
+    if(syncBillTransactions()){ persistLocal(); scheduleSyncPush(); }
     startRealtime(txRef, evRef, metaRef);
     render();
     flashBadge("ok", "✓ 동기화됨");
@@ -1094,6 +1095,7 @@ function startRealtime(txRef, evRef, metaRef){
 function scheduleRemoteRender(){
   if(remoteRenderTimer) clearTimeout(remoteRenderTimer);
   remoteRenderTimer = setTimeout(function(){
+    if(syncBillTransactions()) scheduleSyncPush();  // 상대 기기 변경으로 변동비 재계산이 필요해졌으면 반영 후 재전송
     persistLocal();
     render();
     flashBadge("ok", "✓ 최신 데이터 반영됨");
@@ -1331,7 +1333,47 @@ function loadState(){
   }
 }
 
+var AUTO_BILL_CATEGORY = "카드값 변동비";
+function autoBillId(accId, mk){ return "autobill_" + accId + "_" + mk; }
+
+/* 카드값(청구액)을 입력한 계좌·월에 대해, "청구액 - 실제 입력된 내역 = 변동비"를
+   자동 거래 1건으로 만들어 실제 지출 합계(홈/카테고리/가계부달력 등)에 반영한다.
+   사람이 상세 내역을 더 입력하면 다음 계산 때 자동으로 줄어들며, 절대 이중 계산되지 않는다. */
+function syncBillTransactions(){
+  var changed = false;
+  var validIds = {};
+  state.accounts.forEach(function(a){
+    var bills = a.bills || {};
+    Object.keys(bills).forEach(function(mk){
+      var bill = Number(bills[mk]) || 0;
+      if(bill <= 0) return;
+      var entered = 0;
+      state.transactions.forEach(function(t){
+        if(t.type === "expense" && t.account === a.id && !t.autoBill && txMonthKey(t.date) === mk) entered += Number(t.amount)||0;
+      });
+      var variable = bill - entered;
+      if(variable <= 0) return;
+      var id = autoBillId(a.id, mk);
+      validIds[id] = true;
+      var idx = state.transactions.findIndex(function(t){ return t.id === id; });
+      var lastDay = new Date(Number(mk.slice(0,4)), Number(mk.slice(5,7)), 0).getDate();
+      var data = { id:id, type:"expense", date: mk+"-"+pad2(lastDay), category: AUTO_BILL_CATEGORY,
+                   amount: variable, memo: "", account: a.id, autoBill: true };
+      if(idx > -1){
+        if(state.transactions[idx].amount !== variable){ state.transactions[idx] = data; changed = true; }
+      } else {
+        state.transactions.push(data); changed = true;
+      }
+    });
+  });
+  var before = state.transactions.length;
+  state.transactions = state.transactions.filter(function(t){ return !t.autoBill || validIds[t.id]; });
+  if(state.transactions.length !== before) changed = true;
+  return changed;
+}
+
 function saveState(){
+  syncBillTransactions();
   state._savedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   scheduleSyncPush();
@@ -1513,11 +1555,12 @@ function txRowHtml(t, opts){
   var subParts = [t.date];
   if(acc) subParts.push(acc.name);
   if(t.memo) subParts.push(t.memo);
+  if(t.autoBill) subParts.push("카드값 - 입력내역");
   return (
     '<div class="txrow" data-id="'+t.id+'">'+
       '<div class="txcat">'+txIcon(t.type)+'</div>'+
       '<div class="txmid">'+
-        '<div class="txcatname">'+escapeHtml(t.category)+(isFixed && !opts.hideFixedTag ? '<span class="fixedtag">고정비</span>' : '')+(isRecurring ? '<span class="fixedtag" style="color:var(--primary);background:var(--primary-dim);">🔁반복</span>' : '')+'</div>'+
+        '<div class="txcatname">'+escapeHtml(t.category)+(isFixed && !opts.hideFixedTag ? '<span class="fixedtag">고정비</span>' : '')+(isRecurring ? '<span class="fixedtag" style="color:var(--primary);background:var(--primary-dim);">🔁반복</span>' : '')+(t.autoBill ? '<span class="fixedtag" style="color:var(--text-dim);background:#eef0f3;">🧮자동계산</span>' : '')+'</div>'+
         '<div class="txsub">'+escapeHtml(subParts.join(" · "))+'</div>'+
       '</div>'+
       '<div class="txamt '+t.type+'">'+(t.type === "income" ? "+" : "-")+won(t.amount)+'</div>'+
@@ -1537,7 +1580,12 @@ function wireTxRowClicks(containerId, list){
   container.querySelectorAll(".txrow").forEach(function(row){
     row.addEventListener("click", function(){
       var tx = list.filter(function(t){ return t.id === row.dataset.id; })[0];
-      if(tx) openTxModal(tx);
+      if(!tx) return;
+      if(tx.autoBill){
+        showConfirm("자동 계산된 금액", "카드값에서 직접 입력한 내역을 뺀 나머지예요. 상세 내역을 추가로 입력하면 이 금액이 자동으로 줄어들어요. 카드값은 카드 탭 ⋯ 메뉴에서 수정할 수 있어요.", null, true);
+        return;
+      }
+      openTxModal(tx);
     });
   });
 }
@@ -2211,23 +2259,17 @@ function renderCardTab(){
   });
   var billMk = monthKeyFromDate(ui.viewDate.getFullYear(), ui.viewDate.getMonth());
   var useBills = ui.viewMode !== "all";
-  var anyBill = false;
+  var anyBill = state.accounts.some(function(a){ return useBills && Number((a.bills||{})[billMk]) > 0; });
   var accEntries = state.accounts.map(function(a){
-    var ent = byAcc[a.id]||0;
+    var total = byAcc[a.id]||0;                    // 자동정산 거래가 이미 합산되어 있어 실제 청구액과 일치함
     var fixed = byAccFixed[a.id]||0;
-    var other = ent - fixed;                       // 고정비 외 입력된 지출
-    var bill = useBills ? (Number((a.bills||{})[billMk]) || 0) : 0;
-    if(bill > 0) anyBill = true;
-    var variable = bill > 0 ? Math.max(0, bill - ent) : other;   // 카드값 있으면 미입력분이 변동생활비
-    var total = bill > 0 ? Math.max(bill, ent) : ent;
-    return {name:a.name, total:total, fixed:fixed, other:(bill>0?other:0), variable:variable, hasBill:bill>0};
+    var variable = total - fixed;
+    var hasBill = useBills && Number((a.bills||{})[billMk]) > 0;
+    return {name:a.name, total:total, fixed:fixed, variable:variable, hasBill:hasBill};
   }).sort(function(a,b){ return b.total-a.total; });
 
-  // 범례는 상황에 맞게
   document.getElementById("accLegendKey").innerHTML =
-    '<span><i class="dot fixed"></i>고정비</span>'+
-    (anyBill ? '<span><i class="dot other"></i>입력된 기타지출</span>' : '')+
-    '<span><i class="dot variable"></i>변동생활비</span>';
+    '<span><i class="dot fixed"></i>고정비</span><span><i class="dot variable"></i>변동비</span>';
 
   var accBox = document.getElementById("accBreakdown");
   if(accEntries.length === 0){
@@ -2236,13 +2278,11 @@ function renderCardTab(){
     accBox.innerHTML = accEntries.map(function(e){
       var t = e.total || 1;
       var fixedPct = Math.round(e.fixed/t*100);
-      var otherPct = Math.round(e.other/t*100);
-      var varPct = Math.max(0, 100 - fixedPct - otherPct);
-      var subs = ['고정비 <b>'+won(e.fixed)+'</b>'+(e.total ? ' ('+fixedPct+'%)' : '')];
-      if(e.hasBill) subs.push('기타입력 <b>'+won(e.other)+'</b>');
-      subs.push('변동생활비 <b>'+won(e.variable)+'</b>'+(e.total ? ' ('+varPct+'%)' : ''));
-      return '<div class="accbar-row"><div class="accbar-top"><span class="nm">'+escapeHtml(e.name)+(e.hasBill?' <span style="font-weight:400;color:var(--text-dim);">카드값 기준</span>':'')+'</span><span>'+won(e.total)+'</span></div>'+
-        '<div class="accbar-track"><div class="accbar-fill-wrap" style="width:100%"><div class="accbar-fill-fixed" style="width:'+fixedPct+'%"></div><div class="accbar-fill-other" style="width:'+otherPct+'%"></div><div class="accbar-fill-variable" style="width:'+varPct+'%"></div></div></div>'+
+      var varPct = Math.max(0, 100 - fixedPct);
+      var subs = ['고정비 <b>'+won(e.fixed)+'</b>'+(e.total ? ' ('+fixedPct+'%)' : ''),
+                  '변동비 <b>'+won(e.variable)+'</b>'+(e.total ? ' ('+varPct+'%)' : '')];
+      return '<div class="accbar-row"><div class="accbar-top"><span class="nm">'+escapeHtml(e.name)+(e.hasBill?' <span style="font-weight:400;color:var(--text-dim);">✓ 카드값 반영됨</span>':'')+'</span><span>'+won(e.total)+'</span></div>'+
+        '<div class="accbar-track"><div class="accbar-fill-wrap" style="width:100%"><div class="accbar-fill-fixed" style="width:'+fixedPct+'%"></div><div class="accbar-fill-variable" style="width:'+varPct+'%"></div></div></div>'+
         '<div class="accbar-sub"><span>'+subs.join('</span><span>')+'</span></div>'+
       '</div>';
     }).join("");
@@ -3499,6 +3539,7 @@ function wireEvents(){
 /* ================= Init ================= */
 function init(){
   state = loadState();
+  syncBillTransactions();
   materializeRecurring();
   buildNav();
   wireEvents();
