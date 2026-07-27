@@ -172,16 +172,16 @@ input,select{font-family:inherit;}
 .accbar-fill-other{height:100%;background:#0ea5e9;}
 .accbar-sub{display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);margin-top:5px;}
 .accbar-sub b{color:var(--text);font-weight:700;}
-.goalrow{margin-bottom:16px;}
+.goalrow{margin-bottom:9px;}
 .goalrow:last-child{margin-bottom:0;}
-.goalrow-top{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;margin-bottom:5px;}
+.goalrow-top{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:3px;}
 .goalrow-top .nm{font-weight:700;}
-.goalrow-top .amt{color:var(--text-dim);font-size:11.5px;}
+.goalrow-top .amt{color:var(--text-dim);font-size:11px;}
 .goalrow-top .amt b{color:var(--text);font-weight:700;}
-.goaltrack{height:10px;background:#eef0f3;border-radius:6px;overflow:hidden;}
-.goalfill{height:100%;border-radius:6px;background:var(--primary);transition:width .2s;}
+.goaltrack{height:5px;background:#eef0f3;border-radius:4px;overflow:hidden;}
+.goalfill{height:100%;border-radius:4px;background:var(--primary);transition:width .2s;}
 .goalfill.met{background:#16a34a;}
-.goalsub{display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);margin-top:5px;}
+.goalsub{display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);margin-top:2px;}
 .goalsub .met-tag{color:#16a34a;font-weight:700;}
 .goalsub .left-tag{color:var(--text-dim);}
 .acc-legend-key{display:flex;gap:14px;font-size:11.5px;color:var(--text-dim);margin-bottom:12px;}
@@ -435,8 +435,8 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 
       <div class="tabpanel" id="panel-home" data-tab="home">
         <div class="grid4" id="homeSummary"></div>
-        <div class="cardbox" id="homeGoalBox" style="margin-bottom:18px;display:none;">
-          <div class="cardtitle">이번달 카드 실적</div>
+        <div class="cardbox" id="homeGoalBox" style="margin-bottom:18px;padding:14px 16px;display:none;">
+          <div class="cardtitle" style="font-size:12.5px;margin-bottom:9px;">이번달 카드 실적</div>
           <div id="homeGoalList"></div>
         </div>
         <div class="cardbox" style="margin-bottom:18px;">
@@ -476,8 +476,8 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
       </div>
 
       <div class="tabpanel" id="panel-card" data-tab="card">
-        <div class="cardbox" id="goalBox" style="margin-bottom:18px;display:none;">
-          <div class="cardtitle">이번달 카드 실적</div>
+        <div class="cardbox" id="goalBox" style="margin-bottom:18px;padding:14px 16px;display:none;">
+          <div class="cardtitle" style="font-size:12.5px;margin-bottom:9px;">이번달 카드 실적</div>
           <div id="goalList"></div>
         </div>
         <div class="grid2">
