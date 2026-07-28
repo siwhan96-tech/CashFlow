@@ -347,6 +347,19 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 .calsum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
 .typetoggle button.active[data-owner]{background:var(--primary-dim);color:var(--primary);border-color:var(--primary);}
 .catpickrow{display:flex;gap:8px;}
+/* 카드별 고정비 표 */
+.fixedcard-block{margin-bottom:16px;}
+.fixedcard-block:last-child{margin-bottom:0;}
+.fixedcard-name{font-size:13px;font-weight:800;margin-bottom:6px;padding-left:2px;}
+.fixedcard-table{width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:12.5px;}
+.fixedcard-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.fixedcard-table tr:last-of-type td{border-bottom:none;}
+.fixedcard-table .fc-cat{width:1%;white-space:nowrap;}
+.fc-catpill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;}
+.fixedcard-table .fc-memo{color:var(--text);}
+.fixedcard-table .fc-amt{text-align:right;font-weight:700;white-space:nowrap;}
+.fixedcard-table .fc-subtotal td{background:#fafbfc;font-weight:800;border-top:2px solid var(--border);border-bottom:none;}
+.fixedcard-table .fc-subtotal .fc-amt{color:var(--expense);font-size:13.5px;}
 .catpickrow select{flex:1;}
 .catpickrow .smallbtn{
   border:1px solid var(--border);background:var(--card);border-radius:10px;padding:0 12px;font-size:12px;font-weight:700;color:var(--primary);
@@ -372,6 +385,8 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 .catmanage-row .fixedchk{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--fixed);font-weight:700;}
 .catmanage-row .excludechk{color:var(--text-dim);}
 .catmanage-row .delcat{border:none;background:none;color:var(--text-dim);font-size:15px;}
+.catmanage-row .editrbtn{border:1px solid var(--border);background:var(--card);color:var(--primary);border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:700;white-space:nowrap;}
+.catmanage-row .delrbtn{border:1px solid var(--border);background:var(--card);color:var(--expense);border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:700;white-space:nowrap;}
 .setactions{display:flex;flex-direction:column;gap:10px;margin-top:18px;}
 .setactions button{border:1px solid var(--border);background:var(--card);border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:var(--text);}
 .setactions button.danger{color:var(--expense);}
@@ -476,24 +491,18 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
       </div>
 
       <div class="tabpanel" id="panel-card" data-tab="card">
-        <div class="cardbox" id="goalBox" style="margin-bottom:18px;padding:14px 16px;display:none;">
-          <div class="cardtitle" style="font-size:12.5px;margin-bottom:9px;">이번달 카드 실적</div>
-          <div id="goalList"></div>
+        <div class="cardbox" id="fixedTableBox" style="margin-bottom:18px;">
+          <div class="cardtitle">카드별 고정비 내역</div>
+          <div class="totalbar" style="margin-bottom:14px;">
+            <div class="tlabel">전체 고정비 합계</div>
+            <div class="tval" id="fixedTotal">0원</div>
+          </div>
+          <div id="fixedCardTables"></div>
         </div>
-        <div class="grid2">
-          <div class="cardbox">
-            <div class="cardtitle">계좌별 지출</div>
-            <div class="acc-legend-key" id="accLegendKey"></div>
-            <div id="accBreakdown"></div>
-          </div>
-          <div class="cardbox">
-            <div class="cardtitle">고정비 (보험·구독 등)</div>
-            <div class="totalbar" style="margin-bottom:12px;">
-              <div class="tlabel">고정비 합계</div>
-              <div class="tval" id="fixedTotal">0원</div>
-            </div>
-            <div id="fixedList"></div>
-          </div>
+        <div class="cardbox" style="margin-bottom:18px;">
+          <div class="cardtitle">카드별 소비금액</div>
+          <div class="acc-legend-key" id="accLegendKey"></div>
+          <div id="accBreakdown"></div>
         </div>
         <div class="cardbox">
           <div class="filters">
@@ -749,6 +758,10 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
     <h3 id="billTitle">이번달 카드값</h3>
     <div class="acchint" style="margin:-4px 0 12px;">카드사 앱에 나온 청구액을 입력하면, 입력된 내역을 뺀 나머지를 변동생활비로 계산해요.</div>
     <div id="billList"></div>
+    <div id="billGoalSection" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+      <div class="cardtitle" style="font-size:12.5px;margin-bottom:9px;">🎯 이번달 카드 실적</div>
+      <div id="billGoalList"></div>
+    </div>
     <div class="modalbtns">
       <button class="btn-primary" id="btnCloseBill" style="flex:1;">닫기</button>
     </div>
@@ -1032,7 +1045,9 @@ function reconcileAndWatch(){
       pushMetaNow();
     }
     metaLoaded = true;
-    if(syncBillTransactions()){ persistLocal(); scheduleSyncPush(); }
+    var needsPush = syncBillTransactions();
+    if(dedupeRecurringTransactions()) needsPush = true;
+    if(needsPush){ persistLocal(); scheduleSyncPush(); }
     startRealtime(txRef, evRef, metaRef);
     render();
     flashBadge("ok", "✓ 동기화됨");
@@ -1095,7 +1110,9 @@ function startRealtime(txRef, evRef, metaRef){
 function scheduleRemoteRender(){
   if(remoteRenderTimer) clearTimeout(remoteRenderTimer);
   remoteRenderTimer = setTimeout(function(){
-    if(syncBillTransactions()) scheduleSyncPush();  // 상대 기기 변경으로 변동비 재계산이 필요해졌으면 반영 후 재전송
+    var needsPush2 = syncBillTransactions();
+    if(dedupeRecurringTransactions()) needsPush2 = true;
+    if(needsPush2) scheduleSyncPush();  // 상대 기기 변경으로 변동비 재계산·중복 정리가 필요해졌으면 반영 후 재전송
     persistLocal();
     render();
     flashBadge("ok", "✓ 최신 데이터 반영됨");
@@ -1232,6 +1249,13 @@ var DEFAULT_CATEGORIES = {
 };
 var DEFAULT_FIXED = ["보험","구독서비스"];
 var CHART_COLORS = ["#4f46e5","#f59e0b","#10b981","#ef4444","#0ea5e9","#a855f7","#84cc16","#ec4899","#78716c","#0d9488"];
+
+/* 같은 카테고리 이름은 어디서든(카드별 표 등) 같은 색으로 보이도록 이름 기반으로 색을 고정 배정 */
+function categoryColor(name){
+  var h = 0;
+  for(var i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) >>> 0;
+  return CHART_COLORS[h % CHART_COLORS.length];
+}
 
 var TABS = [
   {id:"home", label:"홈", s:"홈", ic:"🏠"},
@@ -1411,7 +1435,9 @@ var ui = {
   catType: "expense",   // 카테고리 탭에서 보는 종류
   selDate: null,
   editingEventId: null,
-  evOwner: "h"
+  evOwner: "h",
+  editingRecurringScope: "this",
+  editingRecurringId: null
 };
 
 var OWNER_KEY = "kr_cashflow_owner";
@@ -1583,6 +1609,16 @@ function wireTxRowClicks(containerId, list){
       if(!tx) return;
       if(tx.autoBill){
         showConfirm("자동 계산된 금액", "카드값에서 직접 입력한 내역을 뺀 나머지예요. 상세 내역을 추가로 입력하면 이 금액이 자동으로 줄어들어요. 카드값은 카드 탭 ⋯ 메뉴에서 수정할 수 있어요.", null, true);
+        return;
+      }
+      if(tx.recurringId){
+        showConfirm(
+          "반복 고정비 수정",
+          "이번 달 내역만 고칠까요, 등록된 다른 달의 고정비도 함께 고칠까요?",
+          function(){ openTxModal(tx, "this"); },
+          false,
+          { okLabel: "이 달만", okLabel2: "전체 함께", onOk2: function(){ openTxModal(tx, "all"); } }
+        );
         return;
       }
       openTxModal(tx);
@@ -2105,15 +2141,12 @@ function goalRowsHtml(goalAccs){
   }).join("");
 }
 
-function renderGoalBox(){
-  var box = document.getElementById("goalBox");
+function renderBillGoalSection(){
+  var box = document.getElementById("billGoalSection");
   var goalAccs = state.accounts.filter(function(a){ return a.goalAmount > 0; });
-  if(goalAccs.length === 0){
-    box.style.display = "none";
-    return;
-  }
+  if(goalAccs.length === 0){ box.style.display = "none"; return; }
   box.style.display = "block";
-  document.getElementById("goalList").innerHTML = goalRowsHtml(goalAccs);
+  document.getElementById("billGoalList").innerHTML = goalRowsHtml(goalAccs);
 }
 
 function renderHomeGoalBox(){
@@ -2232,7 +2265,7 @@ function renderAccBoxCollapse(){
 
 function renderCardTab(){
   renderAccList();
-  renderGoalBox();
+  renderBillGoalSection();
   renderBillBox();
   renderAccBoxCollapse();
 
@@ -2288,17 +2321,32 @@ function renderCardTab(){
     }).join("");
   }
 
-  // fixed costs (category-based)
+  // 카드별 고정비 표
   var fixedTxs = allExpense.filter(function(t){ return state.fixedCategories.indexOf(t.category) !== -1; });
   var fixedTotal = fixedTxs.reduce(function(s,t){ return s+(Number(t.amount)||0); }, 0);
   document.getElementById("fixedTotal").textContent = won(fixedTotal);
-  var fixedBox = document.getElementById("fixedList");
+  var tbox = document.getElementById("fixedCardTables");
   if(fixedTxs.length === 0){
-    fixedBox.innerHTML = '<div class="empty-state">고정비 내역이 없어요.</div>';
+    tbox.innerHTML = '<div class="empty-state">고정비 내역이 없어요.</div>';
   } else {
-    var sorted = fixedTxs.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
-    fixedBox.innerHTML = sorted.map(function(t){ return txRowHtml(t, {hideFixedTag:true}); }).join("");
-    wireTxRowClicks("fixedList", sorted);
+    var groups = {};              // accId(또는 "") -> [tx...]
+    fixedTxs.forEach(function(t){ (groups[t.account||""] = groups[t.account||""] || []).push(t); });
+    var order = state.accounts.filter(function(a){ return groups[a.id]; }).map(function(a){ return {id:a.id, name:a.name}; });
+    if(groups[""]) order.push({id:"", name:"계좌 미지정"});
+    tbox.innerHTML = order.map(function(g){
+      var txs = groups[g.id].slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+      var sub = txs.reduce(function(s,t){ return s+(Number(t.amount)||0); }, 0);
+      var rows = txs.map(function(t){
+        var col = categoryColor(t.category);
+        return '<tr><td class="fc-cat"><span class="fc-catpill" style="background:'+col+'22;color:'+col+'">'+escapeHtml(t.category)+'</span></td>'+
+          '<td class="fc-memo">'+escapeHtml(t.memo || t.category)+'</td>'+
+          '<td class="fc-amt">'+won(t.amount)+'</td></tr>';
+      }).join("");
+      return '<div class="fixedcard-block"><div class="fixedcard-name">'+escapeHtml(g.name)+'</div>'+
+        '<table class="fixedcard-table"><tbody>'+rows+
+        '<tr class="fc-subtotal"><td colspan="2">고정비 소계</td><td class="fc-amt">'+won(sub)+'</td></tr>'+
+        '</tbody></table></div>';
+    }).join("");
   }
 
   // filtered card list
@@ -2919,13 +2967,36 @@ function saveLoanFromModal(){
 }
 
 /* ================= RECURRING (반복 고정비) ================= */
+// 반복 고정비의 "회차 id"를 규칙id+월로 고정 배정 — 두 기기가 동시에 같은 달을
+// 만들어내도(오프라인 상태 등) 같은 id로 수렴하기 때문에 서버에서 중복 저장되지 않는다.
+function recurTxId(ruleId, mKey){ return "recur_" + ruleId + "_" + mKey; }
+
+// 이미 생겨버린 중복(과거 버전에서 무작위 id로 만들어졌던 것들)을 정리한다.
+// 같은 규칙id+월에 항목이 여러 개면 id가 가장 작은 것만 남기고 나머지를 지운다
+// — 두 기기 모두 같은 규칙으로 골라내므로 결과가 항상 같아진다.
+function dedupeRecurringTransactions(){
+  var keepByKey = {};
+  state.transactions.forEach(function(t){
+    if(!t.recurringId) return;
+    var key = t.recurringId + "|" + txMonthKey(t.date);
+    if(!keepByKey[key] || t.id < keepByKey[key].id) keepByKey[key] = t;
+  });
+  var before = state.transactions.length;
+  state.transactions = state.transactions.filter(function(t){
+    if(!t.recurringId) return true;
+    var key = t.recurringId + "|" + txMonthKey(t.date);
+    return keepByKey[key].id === t.id;
+  });
+  return state.transactions.length !== before;
+}
+
 // Forward-fills missing months for each active recurring rule, from its startDate's
 // month through 12 months ahead of today. Idempotent: skips months that already have
 // a transaction tagged with that rule's recurringId.
 var RECURRING_FORWARD_MONTHS = 12;
 function materializeRecurring(){
-  if(!state.recurring || state.recurring.length===0) return;
-  var changed = false;
+  var changed = dedupeRecurringTransactions();
+  if(!state.recurring || state.recurring.length===0){ if(changed) saveState(); return; }
   var today = new Date();
   var capY = today.getFullYear(), capM = today.getMonth()+RECURRING_FORWARD_MONTHS;
   state.recurring.forEach(function(r){
@@ -2943,7 +3014,7 @@ function materializeRecurring(){
       var day = Math.min(r.day || 1, lastDay);
       var iso = ty+"-"+pad2(tm+1)+"-"+pad2(day);
       state.transactions.push({
-        id: uid(), type:"expense", date: iso, category: r.category, amount: r.amount,
+        id: recurTxId(r.id, mKey), type:"expense", date: iso, category: r.category, amount: r.amount,
         memo: r.memo||"", account: r.account||"", recurringId: r.id
       });
       changed = true;
@@ -2969,8 +3040,10 @@ function setTxType(type){
   if(recField) recField.style.display = (type === "expense" && !ui.editingTxId) ? "block" : "none";
 }
 
-function openTxModal(tx){
-  ui.editingTxId = tx ? tx.id : null;
+function openTxModal(tx, recurringScope){
+  ui.editingTxId = (tx && tx.id) ? tx.id : null;
+  ui.editingRecurringScope = recurringScope || "this";
+  ui.editingRecurringId = tx ? (tx.recurringId || null) : null;
   document.getElementById("txModalTitle").textContent = tx ? "내역 수정" : "내역 추가";
   document.getElementById("newCatRow").classList.remove("show");
   document.getElementById("newCatInput").value = "";
@@ -2987,13 +3060,16 @@ function openTxModal(tx){
   if(defaultType === "expense"){
     document.getElementById("fAccount").value = tx ? (tx.account||"") : (ui.activeTab === "card" && ui.listFilter.card.acc ? ui.listFilter.card.acc : "");
   }
-  document.getElementById("btnDeleteTx").style.display = tx ? "block" : "none";
+  document.getElementById("btnDeleteTx").style.display = (tx && tx.id) ? "block" : "none";
   var recField = document.getElementById("fRecurringField");
   var recNote = document.getElementById("fRecurringNote");
   document.getElementById("fRecurring").checked = false;
   if(tx && tx.recurringId){
     recField.style.display = "none";
     recNote.style.display = "block";
+    recNote.textContent = (ui.editingRecurringScope === "all")
+      ? "🔁 여기서 바꾸면 등록된 다른 달의 고정비 금액·계좌·메모도 함께 바뀌어요. (날짜는 이번 항목만 적용)"
+      : "🔁 매월 반복되는 고정비예요. 저장하면 이번 항목만 바뀌어요.";
   } else {
     recNote.style.display = "none";
     // recField visibility itself is governed by setTxType() above (new + expense only)
@@ -3018,7 +3094,25 @@ function saveTxFromModal(){
   };
   var recChk = document.getElementById("fRecurring");
   var makeRecurring = !ui.editingTxId && type === "expense" && recChk && recChk.checked;
-  if(ui.editingTxId){
+  if(ui.editingRecurringScope === "all" && ui.editingRecurringId){
+    // 반복 규칙 자체를 바꾸고, 이미 만들어진 다른 달 항목들에도 함께 반영한다 (날짜는 건드리지 않음)
+    var rid = ui.editingRecurringId;
+    var rule = state.recurring.filter(function(x){ return x.id === rid; })[0];
+    if(rule){
+      rule.category = data.category; rule.amount = data.amount;
+      rule.memo = data.memo; rule.account = data.account;
+    }
+    state.transactions.forEach(function(t){
+      if(t.recurringId === rid){
+        t.category = data.category; t.amount = data.amount;
+        t.memo = data.memo; t.account = data.account;
+      }
+    });
+    if(ui.editingTxId){
+      var selfIdx = state.transactions.findIndex(function(t){ return t.id === ui.editingTxId; });
+      if(selfIdx > -1) state.transactions[selfIdx].date = data.date;
+    }
+  } else if(ui.editingTxId){
     var idx = state.transactions.findIndex(function(t){ return t.id===ui.editingTxId; });
     if(idx>-1) state.transactions[idx] = Object.assign(state.transactions[idx], data);
   } else if(makeRecurring){
@@ -3048,7 +3142,7 @@ function deleteTx(){
     var rid = tx.recurringId;
     showConfirm(
       "반복 내역 삭제",
-      "매월 반복되는 고정비예요. 이번 달 내역만 삭제할까요, 반복 전체를 중단할까요?",
+      "매월 반복되는 고정비예요. 이번 달 내역만 지울까요, 등록된 모든 달의 내역을 한 번에 지울까요?",
       function(){
         state.transactions = state.transactions.filter(function(t){ return t.id !== ui.editingTxId; });
         saveState();
@@ -3058,15 +3152,10 @@ function deleteTx(){
       false,
       {
         okLabel: "이 달만 삭제",
-        okLabel2: "반복 전체 중단",
+        okLabel2: "전체 삭제",
         onOk2: function(){
-          var r = state.recurring.filter(function(x){ return x.id===rid; })[0];
-          if(r) r.active = false;
-          var curKey = todayIso().slice(0,7);
-          state.transactions = state.transactions.filter(function(t){
-            if(t.recurringId !== rid) return true;
-            return txMonthKey(t.date) < curKey;
-          });
+          state.recurring = state.recurring.filter(function(x){ return x.id !== rid; });
+          state.transactions = state.transactions.filter(function(t){ return t.recurringId !== rid; });
           saveState();
           closeOverlay("txOverlay");
           render();
@@ -3127,19 +3216,25 @@ function renderRecurringManageList(){
     var sub = [escapeHtml(r.category), won(r.amount)];
     if(acc) sub.push(escapeHtml(acc.name));
     if(r.memo) sub.push(escapeHtml(r.memo));
-    return '<div class="catmanage-row"><span class="cn">'+sub.join(" · ")+'</span><button class="delcat" data-id="'+r.id+'">중단</button></div>';
+    return '<div class="catmanage-row"><span class="cn">'+sub.join(" · ")+'</span>'+
+      '<button class="editrbtn" data-editrid="'+r.id+'">수정</button>'+
+      '<button class="delrbtn" data-id="'+r.id+'">전체삭제</button></div>';
   }).join("");
-  box.querySelectorAll(".delcat").forEach(function(btn){
+  box.querySelectorAll("[data-editrid]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var r = state.recurring.filter(function(x){ return x.id === btn.dataset.editrid; })[0];
+      if(!r) return;
+      closeOverlay("settingsOverlay");
+      openTxModal({ id:null, recurringId:r.id, type:"expense", category:r.category, amount:r.amount,
+                    memo:r.memo||"", account:r.account||"", date: todayIso() }, "all");
+    });
+  });
+  box.querySelectorAll(".delrbtn").forEach(function(btn){
     btn.addEventListener("click", function(){
       var rid = btn.dataset.id;
-      showConfirm("반복 중단", "이 반복 고정비를 중단할까요? 이번 달과 이후 생성된 내역은 삭제돼요. (지난 달 내역은 유지돼요)", function(){
-        var r = state.recurring.filter(function(x){ return x.id===rid; })[0];
-        if(r) r.active = false;
-        var curKey = todayIso().slice(0,7);
-        state.transactions = state.transactions.filter(function(t){
-          if(t.recurringId !== rid) return true;
-          return txMonthKey(t.date) < curKey;
-        });
+      showConfirm("반복 고정비 전체 삭제", "이 반복 고정비를 등록된 모든 달에서 한 번에 지울까요? 지난 달 내역까지 함께 지워져요.", function(){
+        state.recurring = state.recurring.filter(function(x){ return x.id !== rid; });
+        state.transactions = state.transactions.filter(function(t){ return t.recurringId !== rid; });
         saveState();
         renderRecurringManageList();
         render();
@@ -3385,6 +3480,7 @@ function wireEvents(){
   if(badgeEl){ badgeEl.style.cursor = "pointer"; badgeEl.addEventListener("click", openSettingsModal); }
   document.getElementById("btnCardMenu").addEventListener("click", function(){
     renderBillBox();
+    renderBillGoalSection();
     openOverlay("billOverlay");
   });
   document.getElementById("btnCloseBill").addEventListener("click", function(){ closeOverlay("billOverlay"); });
