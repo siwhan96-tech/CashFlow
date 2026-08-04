@@ -379,12 +379,17 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 .settabs{display:flex;gap:8px;margin-bottom:14px;}
 .settabs button{flex:1;border:1px solid var(--border);background:var(--card);border-radius:10px;padding:9px;font-size:13px;font-weight:700;color:var(--text-dim);}
 .settabs button.active{background:var(--primary);color:#fff;border-color:var(--primary);}
-.catmanage-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.catmanage-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
 .catmanage-row:last-child{border-bottom:none;}
-.catmanage-row .cn{flex:1;font-size:13.5px;font-weight:600;}
+.catmanage-row .cn{flex:1;font-size:13.5px;font-weight:600;min-width:50px;}
 .catmanage-row .fixedchk{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--fixed);font-weight:700;}
 .catmanage-row .excludechk{color:var(--text-dim);}
 .catmanage-row .delcat{border:none;background:none;color:var(--text-dim);font-size:15px;}
+.catmanage-row .editcat{border:none;background:none;color:var(--primary);font-size:14px;padding:2px 4px;}
+.catmanage-row .cmorder{display:flex;flex-direction:column;gap:2px;}
+.catmanage-row .cmord{border:1px solid var(--border);background:var(--card);color:var(--text-dim);font-size:9px;line-height:1;padding:3px 5px;border-radius:4px;}
+.catmanage-row .cmord:disabled{opacity:.3;}
+.catmanage-row .togglewrap{flex-basis:100%;display:flex;gap:14px;padding-left:36px;}
 .catmanage-row .editrbtn{border:1px solid var(--border);background:var(--card);color:var(--primary);border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:700;white-space:nowrap;}
 .catmanage-row .delrbtn{border:1px solid var(--border);background:var(--card);color:var(--expense);border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:700;white-space:nowrap;}
 .setactions{display:flex;flex-direction:column;gap:10px;margin-top:18px;}
@@ -853,6 +858,40 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
     </div>
     <div class="modalbtns">
       <button class="btn-primary" id="btnCloseSettings" style="flex:1;">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Category manage modal (quick access from category tab ⋯ menu) -->
+<div class="overlay" id="catManageOverlay">
+  <div class="modal">
+    <h3>카테고리 관리</h3>
+    <div class="settabs" id="catMenuGroupTabs">
+      <button type="button" data-g="income">수입 카테고리</button>
+      <button type="button" data-g="expense">지출 카테고리</button>
+    </div>
+    <div id="catMenuManageList"></div>
+    <div class="accaddrow" style="margin-top:12px;">
+      <input type="text" id="catMenuNewCat" placeholder="새 카테고리 이름">
+      <button id="catMenuAddCat">추가</button>
+    </div>
+    <div class="modalbtns">
+      <button class="btn-primary" id="btnCloseCatManage" style="flex:1;">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename category modal -->
+<div class="overlay" id="renameCatOverlay">
+  <div class="modal">
+    <h3>카테고리 이름 변경</h3>
+    <div class="field">
+      <label>이름</label>
+      <input type="text" id="renameCatInput">
+    </div>
+    <div class="modalbtns">
+      <button class="btn-ghost" id="btnCancelRenameCat">취소</button>
+      <button class="btn-primary" id="btnSaveRenameCat">저장</button>
     </div>
   </div>
 </div>
@@ -1526,7 +1565,7 @@ function switchTab(tabId){
   monthNav.style.display = (tabId === "loan") ? "none" : "flex";
   var isCal = (tabId === "schedule" || tabId === "caldiary");
   document.getElementById("toggleAll").style.display = isCal ? "none" : "";
-  document.getElementById("btnCardMenu").style.display = (tabId === "card") ? "flex" : "none";
+  document.getElementById("btnCardMenu").style.display = (tabId === "card" || tabId === "category") ? "flex" : "none";
   if(isCal){
     ui.viewMode = "month";
     if(!ui.selDate || ui.selDate.slice(0,7) !== monthKeyFromDate(ui.viewDate.getFullYear(), ui.viewDate.getMonth())) syncSelDateToMonth();
@@ -3243,21 +3282,30 @@ function renderRecurringManageList(){
   });
 }
 
-function renderCatManageList(){
-  var box = document.getElementById("catManageList");
-  var cats = state.categories[settingsGroup];
+function renderCatManageListInto(boxId, group, afterChange){
+  var box = document.getElementById(boxId);
+  if(!box) return;
+  var cats = state.categories[group];
   if(cats.length === 0){
     box.innerHTML = '<div class="empty-state" style="padding:14px 4px;">카테고리가 없어요.</div>';
     return;
   }
-  box.innerHTML = cats.map(function(c){
+  box.innerHTML = cats.map(function(c, i){
     var isFixed = state.fixedCategories.indexOf(c) !== -1;
     var isExcluded = state.chartExcludeCategories.indexOf(c) !== -1;
-    var fixedToggle = settingsGroup === "expense"
+    var fixedToggle = group === "expense"
       ? '<label class="fixedchk"><input type="checkbox" class="fixedcb" data-name="'+escapeHtml(c)+'" '+(isFixed?"checked":"")+'> 고정비</label>'
       : "";
     var excludeToggle = '<label class="fixedchk excludechk"><input type="checkbox" class="excludecb" data-name="'+escapeHtml(c)+'" '+(isExcluded?"checked":"")+'> 그래프 제외</label>';
-    return '<div class="catmanage-row"><span class="cn">'+escapeHtml(c)+'</span>'+fixedToggle+excludeToggle+'<button class="delcat" data-name="'+escapeHtml(c)+'">×</button></div>';
+    var togglewrap = (fixedToggle || excludeToggle) ? '<div class="togglewrap">'+fixedToggle+excludeToggle+'</div>' : "";
+    var orderBtns = '<div class="cmorder">'
+      + '<button class="cmord" data-dir="up" data-name="'+escapeHtml(c)+'" '+(i===0?"disabled":"")+'>▲</button>'
+      + '<button class="cmord" data-dir="down" data-name="'+escapeHtml(c)+'" '+(i===cats.length-1?"disabled":"")+'>▼</button>'
+      + '</div>';
+    return '<div class="catmanage-row">'+orderBtns+'<span class="cn">'+escapeHtml(c)+'</span>'
+      + '<button class="editcat" data-name="'+escapeHtml(c)+'">✎</button>'
+      + '<button class="delcat" data-name="'+escapeHtml(c)+'">×</button>'
+      + togglewrap + '</div>';
   }).join("");
 
   box.querySelectorAll(".fixedcb").forEach(function(cb){
@@ -3283,19 +3331,86 @@ function renderCatManageList(){
       render();
     });
   });
+  box.querySelectorAll(".cmord").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      if(btn.disabled) return;
+      moveCategory(group, btn.dataset.name, btn.dataset.dir, boxId, afterChange);
+    });
+  });
+  box.querySelectorAll(".editcat").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      openRenameCat(group, btn.dataset.name, boxId, afterChange);
+    });
+  });
   box.querySelectorAll(".delcat").forEach(function(btn){
     btn.addEventListener("click", function(){
       var name = btn.dataset.name;
       showConfirm("카테고리 삭제", '"'+name+'" 카테고리를 삭제할까요? 기존 내역의 카테고리 표시는 유지됩니다.', function(){
-        state.categories[settingsGroup] = state.categories[settingsGroup].filter(function(x){ return x!==name; });
+        state.categories[group] = state.categories[group].filter(function(x){ return x!==name; });
         state.fixedCategories = state.fixedCategories.filter(function(x){ return x!==name; });
         state.chartExcludeCategories = state.chartExcludeCategories.filter(function(x){ return x!==name; });
         saveState();
-        renderCatManageList();
+        renderCatManageListInto(boxId, group, afterChange);
+        if(afterChange) afterChange();
         render();
       });
     });
   });
+}
+
+function moveCategory(group, name, dir, boxId, afterChange){
+  var arr = state.categories[group];
+  var idx = arr.indexOf(name);
+  if(idx === -1) return;
+  var newIdx = idx + (dir === "up" ? -1 : 1);
+  if(newIdx < 0 || newIdx >= arr.length) return;
+  var tmp = arr[idx]; arr[idx] = arr[newIdx]; arr[newIdx] = tmp;
+  saveState();
+  renderCatManageListInto(boxId, group, afterChange);
+  if(afterChange) afterChange();
+  render();
+}
+
+/* ---- Rename category (shared mini modal) ---- */
+var renameCatCtx = null;
+
+function openRenameCat(group, name, boxId, afterChange){
+  renameCatCtx = { group: group, oldName: name, boxId: boxId, afterChange: afterChange };
+  var input = document.getElementById("renameCatInput");
+  input.value = name;
+  openOverlay("renameCatOverlay");
+  setTimeout(function(){ input.focus(); input.select(); }, 50);
+}
+
+function saveRenameCat(){
+  if(!renameCatCtx) return;
+  var ctx = renameCatCtx;
+  var newName = document.getElementById("renameCatInput").value.trim();
+  if(!newName || newName === ctx.oldName){
+    closeOverlay("renameCatOverlay");
+    renameCatCtx = null;
+    return;
+  }
+  if(state.categories[ctx.group].indexOf(newName) !== -1){
+    showConfirm("이미 있는 이름", '"'+newName+'" 카테고리가 이미 있어요. 다른 이름을 입력해주세요.', null, true);
+    return;
+  }
+  var idx = state.categories[ctx.group].indexOf(ctx.oldName);
+  if(idx !== -1) state.categories[ctx.group][idx] = newName;
+  state.fixedCategories = state.fixedCategories.map(function(x){ return x===ctx.oldName ? newName : x; });
+  state.chartExcludeCategories = state.chartExcludeCategories.map(function(x){ return x===ctx.oldName ? newName : x; });
+  (state.transactions||[]).forEach(function(t){ if(t.category === ctx.oldName) t.category = newName; });
+  (state.recurring||[]).forEach(function(r){ if(r.category === ctx.oldName) r.category = newName; });
+  saveState();
+  closeOverlay("renameCatOverlay");
+  renderCatManageListInto(ctx.boxId, ctx.group, ctx.afterChange);
+  if(ctx.afterChange) ctx.afterChange();
+  renameCatCtx = null;
+  render();
+}
+
+function renderCatManageList(){
+  renderCatManageListInto("catManageList", settingsGroup);
 }
 
 function addSettingsCategory(){
@@ -3308,6 +3423,39 @@ function addSettingsCategory(){
   }
   input.value = "";
   renderCatManageList();
+}
+
+/* ---- Category quick-manage popup (category tab ⋯ menu) ---- */
+var catMenuGroup = "expense";
+
+function openCatManageModal(){
+  catMenuGroup = ui.catType === "income" ? "income" : "expense";
+  document.querySelectorAll("#catMenuGroupTabs button").forEach(function(b){
+    b.classList.toggle("active", b.dataset.g === catMenuGroup);
+  });
+  renderCatManageListInto("catMenuManageList", catMenuGroup, function(){
+    fillCategorySelectsAfterEdit();
+  });
+  openOverlay("catManageOverlay");
+}
+
+function addCatMenuCategory(){
+  var input = document.getElementById("catMenuNewCat");
+  var name = input.value.trim();
+  if(!name) return;
+  if(state.categories[catMenuGroup].indexOf(name) === -1){
+    state.categories[catMenuGroup].push(name);
+    saveState();
+  }
+  input.value = "";
+  renderCatManageListInto("catMenuManageList", catMenuGroup, function(){
+    fillCategorySelectsAfterEdit();
+  });
+}
+
+function fillCategorySelectsAfterEdit(){
+  // 카테고리 탭의 필터 드롭다운을 최신 목록으로 갱신
+  if(ui.activeTab === "category") render();
 }
 
 /* ---- CSV export / import ---- */
@@ -3479,11 +3627,28 @@ function wireEvents(){
   var badgeEl = document.getElementById("syncBadge");
   if(badgeEl){ badgeEl.style.cursor = "pointer"; badgeEl.addEventListener("click", openSettingsModal); }
   document.getElementById("btnCardMenu").addEventListener("click", function(){
+    if(ui.activeTab === "category"){
+      openCatManageModal();
+      return;
+    }
     renderBillBox();
     renderBillGoalSection();
     openOverlay("billOverlay");
   });
   document.getElementById("btnCloseBill").addEventListener("click", function(){ closeOverlay("billOverlay"); });
+  document.getElementById("btnCloseCatManage").addEventListener("click", function(){ closeOverlay("catManageOverlay"); });
+  document.getElementById("btnSaveRenameCat").addEventListener("click", saveRenameCat);
+  document.getElementById("btnCancelRenameCat").addEventListener("click", function(){ closeOverlay("renameCatOverlay"); renameCatCtx = null; });
+  document.getElementById("renameCatInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); saveRenameCat(); } });
+  document.getElementById("catMenuAddCat").addEventListener("click", addCatMenuCategory);
+  document.getElementById("catMenuNewCat").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addCatMenuCategory(); } });
+  document.querySelectorAll("#catMenuGroupTabs button").forEach(function(b){
+    b.addEventListener("click", function(){
+      catMenuGroup = b.dataset.g;
+      document.querySelectorAll("#catMenuGroupTabs button").forEach(function(x){ x.classList.toggle("active", x===b); });
+      renderCatManageListInto("catMenuManageList", catMenuGroup, function(){ fillCategorySelectsAfterEdit(); });
+    });
+  });
 
   document.getElementById("btnSettings").addEventListener("click", openSettingsModal);
   document.getElementById("btnSettingsSide").addEventListener("click", openSettingsModal);
@@ -3625,7 +3790,7 @@ function wireEvents(){
   document.getElementById("cardAccFilter").addEventListener("change", function(e){ ui.listFilter.card.acc = e.target.value; render(); });
   document.getElementById("cardCatFilter").addEventListener("change", function(e){ ui.listFilter.card.cat = e.target.value; render(); });
 
-  [["txOverlay","btnCancelTx"],["loanOverlay","btnCancelLoan"],["settingsOverlay","btnCloseSettings"],["accGoalOverlay","btnCancelAccGoal"],["planItemOverlay","btnCancelPlanItem"],["planCellOverlay","btnCancelPlanCell"],["planEventOverlay","btnCancelPlanEvent"],["eventOverlay","btnCancelEvent"],["billOverlay","btnCloseBill"]].forEach(function(pair){
+  [["txOverlay","btnCancelTx"],["loanOverlay","btnCancelLoan"],["settingsOverlay","btnCloseSettings"],["accGoalOverlay","btnCancelAccGoal"],["planItemOverlay","btnCancelPlanItem"],["planCellOverlay","btnCancelPlanCell"],["planEventOverlay","btnCancelPlanEvent"],["eventOverlay","btnCancelEvent"],["billOverlay","btnCloseBill"],["catManageOverlay","btnCloseCatManage"],["renameCatOverlay","btnCancelRenameCat"]].forEach(function(pair){
     document.getElementById(pair[0]).addEventListener("click", function(e){
       if(e.target.id === pair[0]) closeOverlay(pair[0]);
     });
