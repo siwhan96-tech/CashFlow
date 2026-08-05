@@ -604,6 +604,13 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
       <label>금액</label>
       <input type="number" id="fAmount" placeholder="0" inputmode="numeric">
     </div>
+    <div class="field" id="fSettleField" style="display:none;">
+      <label class="checkrow"><input type="checkbox" id="fSettleToggle"> 나중에 나눠서 돌려받을 돈이 있어요 (n빵 정산)</label>
+      <div id="fSettleInputWrap" style="display:none;margin-top:8px;">
+        <input type="number" id="fSettleAmount" placeholder="돌려받을 금액" inputmode="numeric">
+        <div class="acchint" style="margin-top:6px;">전체 금액은 지출로 그대로 남고, 이 금액만큼 수입으로 자동 기록돼요.</div>
+      </div>
+    </div>
     <div class="field">
       <label>메모 (선택)</label>
       <input type="text" id="fMemo" placeholder="메모">
@@ -1617,15 +1624,17 @@ function txRowHtml(t, opts){
   var acc = state.accounts.filter(function(a){ return a.id === t.account; })[0];
   var isFixed = t.type === "expense" && state.fixedCategories.indexOf(t.category) !== -1;
   var isRecurring = !!t.recurringId;
+  var isSettleLinked = !!t.settleOfTxId;
   var subParts = [t.date];
   if(acc) subParts.push(acc.name);
   if(t.memo) subParts.push(t.memo);
   if(t.autoBill) subParts.push("카드값 - 입력내역");
+  if(t.settleAmount > 0) subParts.push("정산 "+won(t.settleAmount)+" 별도기록 (실부담 "+won(t.amount - t.settleAmount)+")");
   return (
     '<div class="txrow" data-id="'+t.id+'">'+
       '<div class="txcat">'+txIcon(t.type)+'</div>'+
       '<div class="txmid">'+
-        '<div class="txcatname">'+escapeHtml(t.category)+(isFixed && !opts.hideFixedTag ? '<span class="fixedtag">고정비</span>' : '')+(isRecurring ? '<span class="fixedtag" style="color:var(--primary);background:var(--primary-dim);">🔁반복</span>' : '')+(t.autoBill ? '<span class="fixedtag" style="color:var(--text-dim);background:#eef0f3;">🧮자동계산</span>' : '')+'</div>'+
+        '<div class="txcatname">'+escapeHtml(t.category)+(isFixed && !opts.hideFixedTag ? '<span class="fixedtag">고정비</span>' : '')+(isRecurring ? '<span class="fixedtag" style="color:var(--primary);background:var(--primary-dim);">🔁반복</span>' : '')+(t.autoBill ? '<span class="fixedtag" style="color:var(--text-dim);background:#eef0f3;">🧮자동계산</span>' : '')+(isSettleLinked ? '<span class="fixedtag" style="color:var(--income);background:#e8f6ee;">👥정산</span>' : '')+'</div>'+
         '<div class="txsub">'+escapeHtml(subParts.join(" · "))+'</div>'+
       '</div>'+
       '<div class="txamt '+t.type+'">'+(t.type === "income" ? "+" : "-")+won(t.amount)+'</div>'+
@@ -1962,7 +1971,7 @@ function renderCalDiaryDay(){
     box.innerHTML = '<div class="daybox"><div class="empty-state" style="padding:14px 4px;">날짜를 누르면 그날 내역을 볼 수 있어요.</div></div>';
     return;
   }
-  var list = state.transactions.filter(function(t){ return t.date === ui.selDate; });
+  var list = state.transactions.filter(function(t){ return t.date === ui.selDate; }).sort(function(a,b){ return b.id.localeCompare(a.id); });
   var tot = periodTotals(list);
   var sub = [];
   if(tot.income) sub.push("수입 "+won(tot.income));
@@ -2088,7 +2097,7 @@ function renderCategoryTab(){
     if(f.cat && t.category !== f.cat) return false;
     if(f.q && (t.memo||"").indexOf(f.q) === -1) return false;
     return true;
-  }).sort(function(a,b){ return b.date.localeCompare(a.date); });
+  }).sort(function(a,b){ return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); });
 
   var box = document.getElementById("categoryList");
   if(list.length === 0){
@@ -2373,7 +2382,7 @@ function renderCardTab(){
     var order = state.accounts.filter(function(a){ return groups[a.id]; }).map(function(a){ return {id:a.id, name:a.name}; });
     if(groups[""]) order.push({id:"", name:"계좌 미지정"});
     tbox.innerHTML = order.map(function(g){
-      var txs = groups[g.id].slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+      var txs = groups[g.id].slice().sort(function(a,b){ return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); });
       var sub = txs.reduce(function(s,t){ return s+(Number(t.amount)||0); }, 0);
       var rows = txs.map(function(t){
         var col = categoryColor(t.category);
@@ -2394,7 +2403,7 @@ function renderCardTab(){
     if(f.acc && t.account !== f.acc) return false;
     if(f.cat && t.category !== f.cat) return false;
     return true;
-  }).sort(function(a,b){ return b.date.localeCompare(a.date); });
+  }).sort(function(a,b){ return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); });
   var box = document.getElementById("cardList");
   if(list.length === 0){
     box.innerHTML = '<div class="empty-state">조건에 맞는 지출 내역이 없어요.</div>';
@@ -3077,6 +3086,8 @@ function setTxType(type){
   }
   var recField = document.getElementById("fRecurringField");
   if(recField) recField.style.display = (type === "expense" && !ui.editingTxId) ? "block" : "none";
+  var settleField = document.getElementById("fSettleField");
+  if(settleField) settleField.style.display = (type === "expense") ? "block" : "none";
 }
 
 function openTxModal(tx, recurringScope){
@@ -3100,6 +3111,23 @@ function openTxModal(tx, recurringScope){
     document.getElementById("fAccount").value = tx ? (tx.account||"") : (ui.activeTab === "card" && ui.listFilter.card.acc ? ui.listFilter.card.acc : "");
   }
   document.getElementById("btnDeleteTx").style.display = (tx && tx.id) ? "block" : "none";
+  var settleField = document.getElementById("fSettleField");
+  var settleToggle = document.getElementById("fSettleToggle");
+  var settleWrap = document.getElementById("fSettleInputWrap");
+  var settleAmountInput = document.getElementById("fSettleAmount");
+  if(tx && tx.recurringId){
+    // 매월 반복되는 고정비는 n빵 정산 대상이 아니라서 숨김
+    if(settleField) settleField.style.display = "none";
+  }
+  if(tx && tx.settleAmount > 0){
+    settleToggle.checked = true;
+    settleWrap.style.display = "block";
+    settleAmountInput.value = tx.settleAmount;
+  } else {
+    settleToggle.checked = false;
+    settleWrap.style.display = "none";
+    settleAmountInput.value = "";
+  }
   var recField = document.getElementById("fRecurringField");
   var recNote = document.getElementById("fRecurringNote");
   document.getElementById("fRecurring").checked = false;
@@ -3123,6 +3151,13 @@ function saveTxFromModal(){
   var category = document.getElementById("fCategory").value;
   if(!category){ showConfirm("입력 필요", "카테고리를 선택해주세요.", null, true); return; }
   var date = document.getElementById("fDate").value || todayIso();
+  var settleChk = document.getElementById("fSettleToggle");
+  var settleAmount = (type === "expense" && settleChk && settleChk.checked)
+    ? (Number(document.getElementById("fSettleAmount").value) || 0) : 0;
+  if(settleAmount > 0 && settleAmount >= amount){
+    showConfirm("입력 확인", "돌려받을 금액은 전체 금액보다 작아야 해요.", null, true);
+    return;
+  }
   var data = {
     type: type,
     date: date,
@@ -3169,9 +3204,64 @@ function saveTxFromModal(){
     data.id = uid();
     state.transactions.push(data);
   }
+  var mainTx = ui.editingTxId ? state.transactions.find(function(t){ return t.id === ui.editingTxId; }) : data;
+  if(mainTx) syncSettleTx(mainTx, settleAmount);
   saveState();
   closeOverlay("txOverlay");
   render();
+}
+
+var SETTLE_CATEGORY = "정산/n빵";
+
+function ensureSettleCategory(){
+  if(state.categories.income.indexOf(SETTLE_CATEGORY) === -1){
+    state.categories.income.push(SETTLE_CATEGORY);
+  }
+  if(state.chartExcludeCategories.indexOf(SETTLE_CATEGORY) === -1){
+    state.chartExcludeCategories.push(SETTLE_CATEGORY);
+  }
+}
+
+function syncSettleTx(mainTx, settleAmount){
+  if(settleAmount > 0){
+    ensureSettleCategory();
+    var linked = mainTx.settleTxId ? state.transactions.find(function(t){ return t.id === mainTx.settleTxId; }) : null;
+    if(linked){
+      linked.amount = settleAmount;
+      linked.date = mainTx.date;
+      linked.memo = "정산 · " + (mainTx.memo || mainTx.category);
+    } else {
+      var sid = uid();
+      state.transactions.push({
+        id: sid, type: "income", date: mainTx.date, category: SETTLE_CATEGORY,
+        amount: settleAmount, memo: "정산 · " + (mainTx.memo || mainTx.category),
+        account: "", settleOfTxId: mainTx.id
+      });
+      mainTx.settleTxId = sid;
+    }
+    mainTx.settleAmount = settleAmount;
+  } else {
+    if(mainTx.settleTxId){
+      state.transactions = state.transactions.filter(function(t){ return t.id !== mainTx.settleTxId; });
+    }
+    mainTx.settleTxId = null;
+    mainTx.settleAmount = 0;
+  }
+}
+
+function removeTxCascade(id){
+  var tx = state.transactions.find(function(t){ return t.id === id; });
+  if(!tx){
+    state.transactions = state.transactions.filter(function(t){ return t.id !== id; });
+    return;
+  }
+  var idsToRemove = [id];
+  if(tx.settleTxId) idsToRemove.push(tx.settleTxId);
+  state.transactions = state.transactions.filter(function(t){ return idsToRemove.indexOf(t.id) === -1; });
+  if(tx.settleOfTxId){
+    var parent = state.transactions.find(function(t){ return t.id === tx.settleOfTxId; });
+    if(parent){ parent.settleTxId = null; parent.settleAmount = 0; }
+  }
 }
 
 function deleteTx(){
@@ -3183,7 +3273,7 @@ function deleteTx(){
       "반복 내역 삭제",
       "매월 반복되는 고정비예요. 이번 달 내역만 지울까요, 등록된 모든 달의 내역을 한 번에 지울까요?",
       function(){
-        state.transactions = state.transactions.filter(function(t){ return t.id !== ui.editingTxId; });
+        removeTxCascade(ui.editingTxId);
         saveState();
         closeOverlay("txOverlay");
         render();
@@ -3204,7 +3294,7 @@ function deleteTx(){
     return;
   }
   showConfirm("내역 삭제", "이 내역을 삭제할까요?", function(){
-    state.transactions = state.transactions.filter(function(t){ return t.id !== ui.editingTxId; });
+    removeTxCascade(ui.editingTxId);
     saveState();
     closeOverlay("txOverlay");
     render();
@@ -3725,6 +3815,11 @@ function wireEvents(){
   document.getElementById("confirmNewCat").addEventListener("click", addNewCategoryInline);
   document.getElementById("newCatInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addNewCategoryInline(); } });
   document.getElementById("btnSaveTx").addEventListener("click", saveTxFromModal);
+  document.getElementById("fSettleToggle").addEventListener("change", function(){
+    var wrap = document.getElementById("fSettleInputWrap");
+    wrap.style.display = this.checked ? "block" : "none";
+    if(!this.checked) document.getElementById("fSettleAmount").value = "";
+  });
   document.getElementById("btnCancelTx").addEventListener("click", function(){ closeOverlay("txOverlay"); });
   document.getElementById("btnDeleteTx").addEventListener("click", deleteTx);
 
