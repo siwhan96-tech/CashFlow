@@ -10,6 +10,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>현금흐름 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -101,6 +104,22 @@ input,select{font-family:inherit;}
 @keyframes calSlideR{
   0%{ transform:translateX(-22px); opacity:.3; }
   100%{ transform:translateX(0); opacity:1; }
+}
+
+.updatebanner{
+  position:fixed; left:14px; right:14px; bottom:86px; z-index:999;
+  background:var(--primary); color:#fff; border-radius:12px; padding:12px 14px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  font-size:13px; font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.18);
+  animation:updateBannerIn .25s ease;
+}
+.updatebanner button{
+  background:#fff; color:var(--primary); border:none; border-radius:8px;
+  padding:7px 12px; font-size:12.5px; font-weight:700; white-space:nowrap;
+}
+@keyframes updateBannerIn{
+  0%{ transform:translateY(12px); opacity:0; }
+  100%{ transform:translateY(0); opacity:1; }
 }
 
 
@@ -938,6 +957,10 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 "use strict";
 
 var STORAGE_KEY = "kr_cashflow_dashboard_v2";
+/* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
+   iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
+   "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
+var APP_VERSION = "2026-08-14-01";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -3955,6 +3978,31 @@ function wireEvents(){
   });
 }
 
+/* ================= 업데이트 확인 (iOS 홈화면 바로가기 캐시 대응) ================= */
+function checkForUpdate(){
+  try{
+    fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
+      .then(function(r){ return r.text(); })
+      .then(function(txt){
+        var m = txt.match(/APP_VERSION\s*=\s*"([^"]+)"/);
+        if(m && m[1] && m[1] !== APP_VERSION) showUpdateBanner();
+      })
+      .catch(function(){ /* 오프라인이거나 네트워크 문제면 조용히 무시 */ });
+  }catch(e){}
+}
+
+function showUpdateBanner(){
+  if(document.getElementById("updateBanner")) return;
+  var el = document.createElement("div");
+  el.id = "updateBanner";
+  el.className = "updatebanner";
+  el.innerHTML = '<span>새 버전이 있어요</span><button id="btnForceReload">새로고침</button>';
+  document.body.appendChild(el);
+  document.getElementById("btnForceReload").addEventListener("click", function(){
+    location.href = location.pathname + "?_v=" + Date.now();
+  });
+}
+
 /* ================= Init ================= */
 function init(){
   state = loadState();
@@ -3965,6 +4013,7 @@ function init(){
   switchTab("home");
   // Firebase 연결 — 첫 렌더링 이후에 시작해서 화면이 먼저 뜼도록 함
   setTimeout(firebaseInit, 300);
+  setTimeout(checkForUpdate, 1200);
 }
 
 if(document.readyState === "loading"){
