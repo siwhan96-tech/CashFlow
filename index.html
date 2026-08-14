@@ -87,6 +87,23 @@ input,select{font-family:inherit;}
 }
 .toggleall.active{background:var(--primary);color:#fff;border-color:var(--primary);}
 
+.mlabel.pulse{animation:mlabelPulse .32s ease;}
+@keyframes mlabelPulse{
+  0%{ color:var(--primary); transform:scale(1.08); }
+  100%{ color:var(--text); transform:scale(1); }
+}
+.cal-slide-l{animation:calSlideL .24s ease;}
+.cal-slide-r{animation:calSlideR .24s ease;}
+@keyframes calSlideL{
+  0%{ transform:translateX(22px); opacity:.3; }
+  100%{ transform:translateX(0); opacity:1; }
+}
+@keyframes calSlideR{
+  0%{ transform:translateX(-22px); opacity:.3; }
+  100%{ transform:translateX(0); opacity:1; }
+}
+
+
 .content{flex:1;padding:20px 24px 100px;overflow-x:hidden;}
 .tabpanel{display:none;}
 .tabpanel.active{display:block;}
@@ -1450,6 +1467,22 @@ function saveState(){
 }
 
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function pulseMonthLabel(){
+  var el = document.getElementById("monthLabel");
+  if(!el) return;
+  el.classList.remove("pulse");
+  void el.offsetWidth; // 리플로우로 애니메이션 재시작
+  el.classList.add("pulse");
+}
+
+function animateCalSlide(containerId, delta){
+  var el = document.getElementById(containerId);
+  if(!el) return;
+  el.classList.remove("cal-slide-l","cal-slide-r");
+  void el.offsetWidth;
+  el.classList.add(delta > 0 ? "cal-slide-l" : "cal-slide-r");
+}
+
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function won(n){
   n = Math.round(Number(n)||0);
@@ -3706,9 +3739,39 @@ function wireEvents(){
     ui.viewDate = new Date(ui.viewDate.getFullYear(), ui.viewDate.getMonth()+delta, 1);
     if(ui.activeTab === "schedule" || ui.activeTab === "caldiary") syncSelDateToMonth();
     render();
+    pulseMonthLabel();
+    if(ui.activeTab === "caldiary") animateCalSlide("caldiaryCal", delta);
+    if(ui.activeTab === "schedule") animateCalSlide("scheduleCal", delta);
   }
   document.getElementById("prevMonth").addEventListener("click", function(){ shiftMonth(-1); });
   document.getElementById("nextMonth").addEventListener("click", function(){ shiftMonth(1); });
+
+  /* 달력 페이지(가계부 캘린더 / 일정) 좌우 스와이프로 월 이동 */
+  var swipeX = null, swipeY = null, swipeT = null;
+  function swipeableTab(){
+    return ui.activeTab === "caldiary" || ui.activeTab === "schedule";
+  }
+  function onSwipeStart(e){
+    if(!swipeableTab()) return;
+    var t = e.touches[0];
+    swipeX = t.clientX; swipeY = t.clientY; swipeT = Date.now();
+  }
+  function onSwipeEnd(e){
+    if(swipeX === null || !swipeableTab()){ swipeX = null; return; }
+    var t = e.changedTouches[0];
+    var dx = t.clientX - swipeX, dy = t.clientY - swipeY, dt = Date.now() - swipeT;
+    swipeX = null;
+    if(dt > 800) return;
+    if(Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.6){
+      shiftMonth(dx < 0 ? 1 : -1);
+    }
+  }
+  ["panel-caldiary","panel-schedule"].forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener("touchstart", onSwipeStart, {passive:true});
+    el.addEventListener("touchend", onSwipeEnd, {passive:true});
+  });
   document.getElementById("toggleAll").addEventListener("click", function(){
     ui.viewMode = ui.viewMode === "all" ? "month" : "all";
     render();
