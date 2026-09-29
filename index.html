@@ -960,7 +960,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-08-14-01";
+var APP_VERSION = "2026-09-29-01";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -1681,16 +1681,19 @@ function txRowHtml(t, opts){
   var isFixed = t.type === "expense" && state.fixedCategories.indexOf(t.category) !== -1;
   var isRecurring = !!t.recurringId;
   var isSettleLinked = !!t.settleOfTxId;
-  var subParts = [t.date];
+  var hasMemo = !!(t.memo && String(t.memo).trim());
+  var mainText = hasMemo ? t.memo : t.category;
+  var subParts = [];
+  if(hasMemo) subParts.push(t.category);
+  subParts.push(t.date);
   if(acc) subParts.push(acc.name);
-  if(t.memo) subParts.push(t.memo);
   if(t.autoBill) subParts.push("카드값 - 입력내역");
   if(t.settleAmount > 0) subParts.push("정산 "+won(t.settleAmount)+" 별도기록 (실부담 "+won(t.amount - t.settleAmount)+")");
   return (
     '<div class="txrow" data-id="'+t.id+'">'+
       '<div class="txcat">'+txIcon(t.type)+'</div>'+
       '<div class="txmid">'+
-        '<div class="txcatname">'+escapeHtml(t.category)+(isFixed && !opts.hideFixedTag ? '<span class="fixedtag">고정비</span>' : '')+(isRecurring ? '<span class="fixedtag" style="color:var(--primary);background:var(--primary-dim);">🔁반복</span>' : '')+(t.autoBill ? '<span class="fixedtag" style="color:var(--text-dim);background:#eef0f3;">🧮자동계산</span>' : '')+(isSettleLinked ? '<span class="fixedtag" style="color:var(--income);background:#e8f6ee;">👥정산</span>' : '')+'</div>'+
+        '<div class="txcatname">'+escapeHtml(mainText)+(isFixed && !opts.hideFixedTag ? '<span class="fixedtag">고정비</span>' : '')+(isRecurring ? '<span class="fixedtag" style="color:var(--primary);background:var(--primary-dim);">🔁반복</span>' : '')+(t.autoBill ? '<span class="fixedtag" style="color:var(--text-dim);background:#eef0f3;">🧮자동계산</span>' : '')+(isSettleLinked ? '<span class="fixedtag" style="color:var(--income);background:#e8f6ee;">👥정산</span>' : '')+'</div>'+
         '<div class="txsub">'+escapeHtml(subParts.join(" · "))+'</div>'+
       '</div>'+
       '<div class="txamt '+t.type+'">'+(t.type === "income" ? "+" : "-")+won(t.amount)+'</div>'+
