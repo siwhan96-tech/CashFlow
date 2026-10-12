@@ -960,7 +960,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-09-29-01";
+var APP_VERSION = "2026-10-12-02";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -1660,6 +1660,18 @@ function currentBalance(){
   return sum;
 }
 
+/* n빵 정산분(settleAmount)을 뺀 "내가 실제로 부담한 금액" — 카테고리 집계/그래프용 */
+function netAmount(t){
+  var a = Number(t.amount)||0;
+  if(t.type === "expense" && t.settleAmount > 0) a -= Number(t.settleAmount)||0;
+  return a > 0 ? a : 0;
+}
+
+/* 정산으로 돌려받는 수입(자동 연결분 + 정산/n빵 카테고리) 여부 */
+function isSettleIncome(t){
+  return t.type === "income" && (!!t.settleOfTxId || t.category === "정산/n빵");
+}
+
 function periodTotals(list){
   var income = 0, expense = 0;
   list.forEach(function(t){
@@ -1688,7 +1700,10 @@ function txRowHtml(t, opts){
   subParts.push(t.date);
   if(acc) subParts.push(acc.name);
   if(t.autoBill) subParts.push("카드값 - 입력내역");
-  if(t.settleAmount > 0) subParts.push("정산 "+won(t.settleAmount)+" 별도기록 (실부담 "+won(t.amount - t.settleAmount)+")");
+  if(t.settleAmount > 0){
+    if(opts.net) subParts.push("총 결제 "+won(t.amount)+" · 정산 "+won(t.settleAmount)+" 제외");
+    else subParts.push("정산 "+won(t.settleAmount)+" 별도기록 (실부담 "+won(t.amount - t.settleAmount)+")");
+  }
   return (
     '<div class="txrow" data-id="'+t.id+'">'+
       '<div class="txcat">'+txIcon(t.type)+'</div>'+
@@ -1696,7 +1711,7 @@ function txRowHtml(t, opts){
         '<div class="txcatname">'+escapeHtml(mainText)+(isFixed && !opts.hideFixedTag ? '<span class="fixedtag">고정비</span>' : '')+(isRecurring ? '<span class="fixedtag" style="color:var(--primary);background:var(--primary-dim);">🔁반복</span>' : '')+(t.autoBill ? '<span class="fixedtag" style="color:var(--text-dim);background:#eef0f3;">🧮자동계산</span>' : '')+(isSettleLinked ? '<span class="fixedtag" style="color:var(--income);background:#e8f6ee;">👥정산</span>' : '')+'</div>'+
         '<div class="txsub">'+escapeHtml(subParts.join(" · "))+'</div>'+
       '</div>'+
-      '<div class="txamt '+t.type+'">'+(t.type === "income" ? "+" : "-")+won(t.amount)+'</div>'+
+      '<div class="txamt '+t.type+'">'+(t.type === "income" ? "+" : "-")+won(opts.net && t.type === "expense" ? netAmount(t) : t.amount)+'</div>'+
     '</div>'
   );
 }
@@ -1998,9 +2013,10 @@ function renderCalDiaryTab(){
   var y = ui.viewDate.getFullYear(), m = ui.viewDate.getMonth();
   var byDate = {};
   state.transactions.forEach(function(t){
+    if(isSettleIncome(t)) return;   // 정산 수입은 달력에 표시하지 않음 (지출은 실부담 금액으로 반영)
     if(!byDate[t.date]) byDate[t.date] = { inc:0, exp:0 };
     if(t.type === "income") byDate[t.date].inc += Number(t.amount)||0;
-    else byDate[t.date].exp += Number(t.amount)||0;
+    else byDate[t.date].exp += netAmount(t);
   });
   var mk = monthKeyFromDate(y, m), inc = 0, exp = 0;
   Object.keys(byDate).forEach(function(k){
@@ -2030,8 +2046,12 @@ function renderCalDiaryDay(){
     box.innerHTML = '<div class="daybox"><div class="empty-state" style="padding:14px 4px;">날짜를 누르면 그날 내역을 볼 수 있어요.</div></div>';
     return;
   }
-  var list = state.transactions.filter(function(t){ return t.date === ui.selDate; }).sort(function(a,b){ return b.id.localeCompare(a.id); });
-  var tot = periodTotals(list);
+  var list = state.transactions.filter(function(t){ return t.date === ui.selDate && !isSettleIncome(t); }).sort(function(a,b){ return b.id.localeCompare(a.id); });
+  var tot = { income: 0, expense: 0 };
+  list.forEach(function(t){
+    if(t.type === "income") tot.income += Number(t.amount)||0;
+    else tot.expense += netAmount(t);
+  });
   var sub = [];
   if(tot.income) sub.push("수입 "+won(tot.income));
   if(tot.expense) sub.push("지출 "+won(tot.expense));
@@ -2041,7 +2061,7 @@ function renderCalDiaryDay(){
   if(!list.length){
     h += '<div class="empty-state" style="padding:14px 4px;">이 날은 내역이 없어요.</div>';
   } else {
-    h += '<div id="caldiaryTxList">' + list.map(function(t){ return txRowHtml(t); }).join("") + '</div>';
+    h += '<div id="caldiaryTxList">' + list.map(function(t){ return txRowHtml(t, {net:true}); }).join("") + '</div>';
   }
   box.innerHTML = h + '</div>';
   var addBtn = document.getElementById("btnAddTxDay");
@@ -2146,8 +2166,8 @@ function renderCategoryTab(){
   var all = transactionsInPeriod().filter(function(t){ return t.type === (isInc ? "income" : "expense"); });
   var tot = periodTotals(all);
   document.getElementById("categorySummary").innerHTML =
-    scard((ui.viewMode==="all"?"전체":"이번달")+(isInc?" 수입":" 지출")+" 합계",
-          won(isInc ? tot.income : tot.expense), isInc ? "income" : "expense") +
+    scard((ui.viewMode==="all"?"전체":"이번달")+(isInc?" 수입":" 지출(실부담)")+" 합계",
+          won(isInc ? tot.income : all.reduce(function(s,t){ return s+netAmount(t); }, 0)), isInc ? "income" : "expense") +
     scard("건수", all.length+"건", "");
 
   renderCategoryChart(all.filter(function(t){ return state.chartExcludeCategories.indexOf(t.category) === -1; }), isInc, all);
@@ -2189,7 +2209,7 @@ function renderCategoryChart(txList, isInc, fullList){
 
   var byCat = {};
   txList.forEach(function(t){
-    byCat[t.category] = (byCat[t.category]||0) + (Number(t.amount)||0);
+    byCat[t.category] = (byCat[t.category]||0) + netAmount(t);
   });
   var entries = Object.keys(byCat).map(function(k){ return {name:k, amt:byCat[k]}; }).sort(function(a,b){ return b.amt-a.amt; });
   var total = entries.reduce(function(s,e){ return s+e.amt; }, 0);
