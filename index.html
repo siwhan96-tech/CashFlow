@@ -136,6 +136,7 @@ input,select{font-family:inherit;}
 .scard .sval{font-size:19px;font-weight:800;}
 .scard.income .sval{color:var(--income);}
 .scard.expense .sval{color:var(--expense);}
+.scard.saving .sval{color:#0d9488;}
 .scard.balance .sval{color:var(--primary);font-size:22px;}
 
 .chartwrap{height:230px;position:relative;}
@@ -364,7 +365,7 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 .evbar.h{background:#2563eb;} .evbar.w{background:#db2777;} .evbar.both{background:#7c3aed;}
 .evmore{font-size:10px;color:var(--text-dim);padding-left:3px;}
 .calamt{font-size:10px;font-weight:700;line-height:1.45;text-align:right;padding-right:2px;white-space:nowrap;overflow:hidden;}
-.calamt.inc{color:var(--income);} .calamt.exp{color:var(--expense);}
+.calamt.inc{color:var(--income);} .calamt.exp{color:var(--expense);} .calamt.sav{color:#0d9488;}
 .calholname{font-size:9px;color:var(--expense);text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .calholname.off{color:var(--primary);}
 .caldnum.off{color:var(--primary);}
@@ -960,7 +961,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-10-12-02";
+var APP_VERSION = "2026-10-14-01";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -1354,6 +1355,17 @@ var TABS = [
 
 var state = null;
 
+/* 저축: "저축" 카테고리 지출 거래. 지출 합계/지출 그래프에서는 제외하고 저축 항목에만 합산 */
+var SAVING_CATEGORY = "저축";
+function isSaving(t){ return t.type === "expense" && t.category === SAVING_CATEGORY; }
+function ensureSavingCategory(st){
+  if(!st.categories || !Array.isArray(st.categories.expense)) return st;
+  if(st.categories.expense.indexOf(SAVING_CATEGORY) === -1) st.categories.expense.push(SAVING_CATEGORY);
+  if(!Array.isArray(st.chartExcludeCategories)) st.chartExcludeCategories = [];
+  if(st.chartExcludeCategories.indexOf(SAVING_CATEGORY) === -1) st.chartExcludeCategories.push(SAVING_CATEGORY);
+  return st;
+}
+
 function defaultState(){
   return {
     startingBalance: 0,
@@ -1401,7 +1413,7 @@ function migrateLoan(l){
 function loadState(){
   try{
     var raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return defaultState();
+    if(!raw) return ensureSavingCategory(defaultState());
     var parsed = JSON.parse(raw);
     var d = defaultState();
     parsed.startingBalance = Number(parsed.startingBalance)||0;
@@ -1437,9 +1449,9 @@ function loadState(){
     });
     parsed.loans.forEach(migrateLoan);
     parsed.transactions.forEach(function(t){ if(typeof t.account !== "string") t.account = ""; });
-    return parsed;
+    return ensureSavingCategory(parsed);
   }catch(e){
-    return defaultState();
+    return ensureSavingCategory(defaultState());
   }
 }
 
@@ -1673,12 +1685,13 @@ function isSettleIncome(t){
 }
 
 function periodTotals(list){
-  var income = 0, expense = 0;
+  var income = 0, expense = 0, saving = 0;
   list.forEach(function(t){
     if(t.type === "income") income += Number(t.amount)||0;
+    else if(isSaving(t)) saving += Number(t.amount)||0;
     else expense += Number(t.amount)||0;
   });
-  return { income: income, expense: expense, net: income - expense };
+  return { income: income, expense: expense, saving: saving, net: income - expense - saving };
 }
 
 function scard(label, val, cls){
@@ -2014,18 +2027,20 @@ function renderCalDiaryTab(){
   var byDate = {};
   state.transactions.forEach(function(t){
     if(isSettleIncome(t)) return;   // 정산 수입은 달력에 표시하지 않음 (지출은 실부담 금액으로 반영)
-    if(!byDate[t.date]) byDate[t.date] = { inc:0, exp:0 };
+    if(!byDate[t.date]) byDate[t.date] = { inc:0, exp:0, sav:0 };
     if(t.type === "income") byDate[t.date].inc += Number(t.amount)||0;
+    else if(isSaving(t)) byDate[t.date].sav += Number(t.amount)||0;
     else byDate[t.date].exp += netAmount(t);
   });
-  var mk = monthKeyFromDate(y, m), inc = 0, exp = 0;
+  var mk = monthKeyFromDate(y, m), inc = 0, exp = 0, sav = 0;
   Object.keys(byDate).forEach(function(k){
-    if(k.slice(0,7) === mk){ inc += byDate[k].inc; exp += byDate[k].exp; }
+    if(k.slice(0,7) === mk){ inc += byDate[k].inc; exp += byDate[k].exp; sav += byDate[k].sav; }
   });
   document.getElementById("caldiarySummary").innerHTML =
     scard("이번달 수입", won(inc), "income") +
     scard("이번달 지출", won(exp), "expense") +
-    scard("순액", (inc-exp >= 0 ? "+" : "")+won(inc-exp), inc-exp >= 0 ? "income" : "expense");
+    scard("이번달 저축", won(sav), "saving") +
+    scard("순액", (inc-exp-sav >= 0 ? "+" : "")+won(inc-exp-sav), inc-exp-sav >= 0 ? "income" : "expense");
 
   document.getElementById("caldiaryCal").innerHTML = calendarHtml(y, m, function(iso, inMonth){
     if(!inMonth) return "";
@@ -2034,6 +2049,7 @@ function renderCalDiaryTab(){
     var h = "";
     if(v.inc) h += '<div class="calamt inc">+'+shortAmt(v.inc)+'</div>';
     if(v.exp) h += '<div class="calamt exp">-'+shortAmt(v.exp)+'</div>';
+    if(v.sav) h += '<div class="calamt sav">저축 '+shortAmt(v.sav)+'</div>';
     return h;
   });
   wireCalCells("caldiaryCal");
@@ -2080,6 +2096,7 @@ function renderHome(){
   html += scard("현재 잔액", won(currentBalance()), "balance");
   html += scard((ui.viewMode==="all"?"전체":"이번달")+" 수입", won(tot.income), "income");
   html += scard((ui.viewMode==="all"?"전체":"이번달")+" 지출", won(tot.expense), "expense");
+  html += scard((ui.viewMode==="all"?"전체":"이번달")+" 저축", won(tot.saving), "saving");
   html += scard("순현금흐름", (tot.net>=0?"+":"")+won(tot.net), tot.net>=0?"income":"expense");
   document.getElementById("homeSummary").innerHTML = html;
 
@@ -2112,7 +2129,11 @@ function renderTrendChart(){
       .reduce(function(s,t){ return s+(Number(t.amount)||0); }, 0);
   });
   var expenseData = months.map(function(m){
-    return state.transactions.filter(function(t){ return t.type==="expense" && txMonthKey(t.date)===m.key; })
+    return state.transactions.filter(function(t){ return t.type==="expense" && !isSaving(t) && txMonthKey(t.date)===m.key; })
+      .reduce(function(s,t){ return s+(Number(t.amount)||0); }, 0);
+  });
+  var savingData = months.map(function(m){
+    return state.transactions.filter(function(t){ return isSaving(t) && txMonthKey(t.date)===m.key; })
       .reduce(function(s,t){ return s+(Number(t.amount)||0); }, 0);
   });
   if(trendChartInst){ trendChartInst.destroy(); trendChartInst = null; }
@@ -2123,7 +2144,8 @@ function renderTrendChart(){
       labels: months.map(function(m){ return m.label; }),
       datasets: [
         { label:"수입", data: incomeData, backgroundColor:"#4f46e5", borderRadius:6 },
-        { label:"지출", data: expenseData, backgroundColor:"#dc2626", borderRadius:6 }
+        { label:"지출", data: expenseData, backgroundColor:"#dc2626", borderRadius:6 },
+        { label:"저축", data: savingData, backgroundColor:"#0d9488", borderRadius:6 }
       ]
     },
     options: {
@@ -2167,7 +2189,7 @@ function renderCategoryTab(){
   var tot = periodTotals(all);
   document.getElementById("categorySummary").innerHTML =
     scard((ui.viewMode==="all"?"전체":"이번달")+(isInc?" 수입":" 지출(실부담)")+" 합계",
-          won(isInc ? tot.income : all.reduce(function(s,t){ return s+netAmount(t); }, 0)), isInc ? "income" : "expense") +
+          won(isInc ? tot.income : all.reduce(function(s,t){ return isSaving(t) ? s : s+netAmount(t); }, 0)), isInc ? "income" : "expense") +
     scard("건수", all.length+"건", "");
 
   renderCategoryChart(all.filter(function(t){ return state.chartExcludeCategories.indexOf(t.category) === -1; }), isInc, all);
@@ -3514,6 +3536,10 @@ function renderCatManageListInto(boxId, group, afterChange){
   box.querySelectorAll(".delcat").forEach(function(btn){
     btn.addEventListener("click", function(){
       var name = btn.dataset.name;
+      if(group === "expense" && name === SAVING_CATEGORY){
+        showConfirm("삭제 불가", '"저축"은 저축 합계 집계에 쓰이는 기본 카테고리라 삭제할 수 없어요.', null, true);
+        return;
+      }
       showConfirm("카테고리 삭제", '"'+name+'" 카테고리를 삭제할까요? 기존 내역의 카테고리 표시는 유지됩니다.', function(){
         state.categories[group] = state.categories[group].filter(function(x){ return x!==name; });
         state.fixedCategories = state.fixedCategories.filter(function(x){ return x!==name; });
@@ -3544,6 +3570,10 @@ function moveCategory(group, name, dir, boxId, afterChange){
 var renameCatCtx = null;
 
 function openRenameCat(group, name, boxId, afterChange){
+  if(group === "expense" && name === SAVING_CATEGORY){
+    showConfirm("변경 불가", '"저축"은 저축 합계 집계에 쓰이는 기본 카테고리라 이름을 바꿀 수 없어요.', null, true);
+    return;
+  }
   renameCatCtx = { group: group, oldName: name, boxId: boxId, afterChange: afterChange };
   var input = document.getElementById("renameCatInput");
   input.value = name;
