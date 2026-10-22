@@ -137,6 +137,15 @@ input,select{font-family:inherit;}
 .scard.income .sval{color:var(--income);}
 .scard.expense .sval{color:var(--expense);}
 .scard.saving .sval{color:#0d9488;}
+.shopaddrow{display:flex;gap:8px;margin-bottom:10px;}
+.shopaddrow input{flex:1;min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:10px;font-size:15px;background:var(--card);color:var(--text);}
+.shopaddrow button{white-space:nowrap;padding:0 16px;}
+.shoprow{display:flex;align-items:center;gap:10px;padding:11px 2px;border-top:1px solid var(--border);}
+.shoprow:first-child{border-top:none;}
+.shoprow input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:var(--primary);}
+.shoprow .shoptext{flex:1;min-width:0;font-size:15px;word-break:break-all;cursor:pointer;}
+.shoprow.done .shoptext{color:var(--text-dim);text-decoration:line-through;}
+.shoprow .shopdel{border:none;background:none;color:var(--text-dim);font-size:20px;line-height:1;padding:4px 8px;cursor:pointer;}
 .scard.balance .sval{color:var(--primary);font-size:22px;}
 
 .chartwrap{height:230px;position:relative;}
@@ -500,9 +509,30 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
           <div class="cardtitle">최근 6개월 추이</div>
           <div class="chartwrap"><canvas id="trendChart"></canvas></div>
         </div>
-        <div class="cardbox" id="homeRecentBox">
+        <div class="cardbox" id="homeRecentBox" style="margin-bottom:18px;">
           <div class="cardtitle">최근 내역</div>
           <div id="homeRecentList"></div>
+        </div>
+        <div class="cardbox" style="margin-bottom:18px;">
+          <div class="cardtitle">대출 관리</div>
+          <div id="loanMiniList"></div>
+          <div class="accaddrow" style="margin-top:10px;">
+            <button class="btn-ghost" id="btnAddLoanMini" style="width:100%;">+ 대출 추가</button>
+          </div>
+        </div>
+
+        <div class="cardbox">
+          <div class="cardtitle">자금계획표</div>
+          <div class="planrange-row">
+            <button class="navbtn" id="planRangePrev">‹</button>
+            <div class="planrange-label" id="planRangeLabel"></div>
+            <button class="navbtn" id="planRangeNext">›</button>
+          </div>
+          <div class="plantable-wrap">
+            <table class="plantable" id="planTable"></table>
+          </div>
+          <div class="empty-state" id="planEmpty" style="display:none;">아직 등록된 항목이 없어요.<br>아래 [+ 항목 추가] 버튼으로 추가해보세요.</div>
+          <button class="btn-ghost" id="btnAddPlanItem" style="width:100%;margin-top:10px;">+ 항목 추가</button>
         </div>
       </div>
 
@@ -580,26 +610,19 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
         <div id="caldiaryDay"></div>
       </div>
 
-      <div class="tabpanel" id="panel-loan" data-tab="loan">
-        <div class="cardbox" style="margin-bottom:18px;">
-          <div class="cardtitle">대출 관리</div>
-          <div id="loanMiniList"></div>
-          <div class="accaddrow" style="margin-top:10px;">
-            <button class="btn-ghost" id="btnAddLoanMini" style="width:100%;">+ 대출 추가</button>
+      <div class="tabpanel" id="panel-shop" data-tab="shop">
+        <div class="cardbox" style="margin-bottom:14px;">
+          <div class="cardtitle">사야할 것 <span id="shopCount" style="font-weight:600;color:var(--text-dim);font-size:12px;"></span></div>
+          <div class="shopaddrow">
+            <input type="text" id="shopInput" placeholder="사야할 것 입력 (예: 건전지, 수세미)" maxlength="60" autocomplete="off">
+            <button class="btn-ghost" id="shopAddBtn">추가</button>
           </div>
+          <div id="shopTodoList"></div>
         </div>
-
-        <div class="cardbox">
-          <div class="cardtitle">자금계획표</div>
-          <div class="planrange-row">
-            <button class="navbtn" id="planRangePrev">‹</button>
-            <div class="planrange-label" id="planRangeLabel"></div>
-            <button class="navbtn" id="planRangeNext">›</button>
-          </div>
-          <div class="plantable-wrap">
-            <table class="plantable" id="planTable"></table>
-          </div>
-          <div class="empty-state" id="planEmpty" style="display:none;">아직 등록된 항목이 없어요.<br>우측 하단 + 버튼으로 항목을 추가해보세요.</div>
+        <div class="cardbox" id="shopDoneBox" style="display:none;">
+          <div class="cardtitle">구매 완료 <span id="shopDoneCount" style="font-weight:600;color:var(--text-dim);font-size:12px;"></span></div>
+          <div id="shopDoneList"></div>
+          <button class="btn-ghost" id="shopClearDone" style="width:100%;margin-top:10px;">구매 완료 항목 비우기</button>
         </div>
       </div>
 
@@ -636,6 +659,14 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
     <div class="field" id="fAccountField">
       <label>카드 / 계좌</label>
       <select id="fAccount"><option value="">선택 안함</option></select>
+    </div>
+    <div class="field" id="fFixedModeField">
+      <label>고정비 구분</label>
+      <select id="fFixedMode">
+        <option value="">카테고리 기준</option>
+        <option value="fixed">이번 건은 고정비로</option>
+        <option value="variable">이번 건은 변동비로</option>
+      </select>
     </div>
     <div class="field">
       <label>금액</label>
@@ -961,7 +992,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-10-14-01";
+var APP_VERSION = "2026-10-14-03";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -985,6 +1016,7 @@ var syncDebounceTimer = null;
 var remoteRenderTimer = null;
 var lastSyncedTx = {};      // { txId: JSON 문자열 } — 서버와 마지막으로 맞춘 상태
 var lastSyncedEv = {};      // { eventId: JSON 문자열 }
+var lastSyncedShop = {};    // { shopItemId: JSON 문자열 }
 var lastMetaJson = "";
 var metaLoaded = false;
 
@@ -1015,10 +1047,11 @@ function loadSnapshot(){
     var o = JSON.parse(localStorage.getItem(SNAPSHOT_KEY)) || {};
     lastSyncedTx = o.tx || o;      // 구버전 형식(거래만) 호환
     lastSyncedEv = o.ev || {};
-  }catch(e){ lastSyncedTx = {}; lastSyncedEv = {}; }
+    lastSyncedShop = o.shop || {};
+  }catch(e){ lastSyncedTx = {}; lastSyncedEv = {}; lastSyncedShop = {}; }
 }
 function saveSnapshot(){
-  try{ localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ tx: lastSyncedTx, ev: lastSyncedEv })); }catch(e){}
+  try{ localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ tx: lastSyncedTx, ev: lastSyncedEv, shop: lastSyncedShop })); }catch(e){}
 }
 
 function setSyncBadge(status, text){
@@ -1112,12 +1145,14 @@ function reconcileList(remote, key, snapMap, ref){
 function reconcileAndWatch(){
   var txRef = fbDb.ref(DB_ROOT + "/transactions");
   var evRef = fbDb.ref(DB_ROOT + "/events");
+  var shopRef = fbDb.ref(DB_ROOT + "/shopItems");
   var metaRef = fbDb.ref(DB_ROOT + "/meta");
   setSyncBadge("syncing", "동기화 중…");
 
-  Promise.all([txRef.once("value"), evRef.once("value")]).then(function(res){
+  Promise.all([txRef.once("value"), evRef.once("value"), shopRef.once("value")]).then(function(res){
     reconcileList(res[0].val() || {}, "transactions", lastSyncedTx, txRef);
     reconcileList(res[1].val() || {}, "events", lastSyncedEv, evRef);
+    reconcileList(res[2].val() || {}, "shopItems", lastSyncedShop, shopRef);
     saveSnapshot();
     persistLocal();
     return metaRef.once("value");
@@ -1135,7 +1170,7 @@ function reconcileAndWatch(){
     var needsPush = syncBillTransactions();
     if(dedupeRecurringTransactions()) needsPush = true;
     if(needsPush){ persistLocal(); scheduleSyncPush(); }
-    startRealtime(txRef, evRef, metaRef);
+    startRealtime(txRef, evRef, metaRef, shopRef);
     render();
     flashBadge("ok", "✓ 동기화됨");
   }).catch(function(e){
@@ -1147,7 +1182,7 @@ function reconcileAndWatch(){
 function applyMeta(json){
   try{
     var m = JSON.parse(json);
-    var merged = Object.assign({}, m, { transactions: state.transactions, events: state.events, _savedAt: state._savedAt });
+    var merged = Object.assign({}, m, { transactions: state.transactions, events: state.events, shopItems: state.shopItems, _savedAt: state._savedAt });
     state = loadStateFromObj(merged);
     lastMetaJson = json;
     persistLocal();
@@ -1181,9 +1216,10 @@ function watchList(ref, key, snapMap){
   });
 }
 
-function startRealtime(txRef, evRef, metaRef){
+function startRealtime(txRef, evRef, metaRef, shopRef){
   watchList(txRef, "transactions", lastSyncedTx);
   watchList(evRef, "events", lastSyncedEv);
+  watchList(shopRef, "shopItems", lastSyncedShop);
   metaRef.on("value", function(snap){
     var v = snap.val();
     if(!v || !v.json) return;
@@ -1232,9 +1268,11 @@ function pushChanges(){
   var jobs = [];
   var jt = pushList(fbDb.ref(DB_ROOT + "/transactions"), "transactions", lastSyncedTx);
   var je = pushList(fbDb.ref(DB_ROOT + "/events"), "events", lastSyncedEv);
+  var jsh = pushList(fbDb.ref(DB_ROOT + "/shopItems"), "shopItems", lastSyncedShop);
   if(jt) jobs.push(jt);
   if(je) jobs.push(je);
-  if(jt || je) saveSnapshot();
+  if(jsh) jobs.push(jsh);
+  if(jt || je || jsh) saveSnapshot();
 
   var metaJson = JSON.stringify(metaObject());
   if(metaLoaded && metaJson !== lastMetaJson){
@@ -1266,19 +1304,23 @@ function forcePullAll(){
   Promise.all([
     fbDb.ref(DB_ROOT + "/transactions").once("value"),
     fbDb.ref(DB_ROOT + "/events").once("value"),
-    fbDb.ref(DB_ROOT + "/meta").once("value")
+    fbDb.ref(DB_ROOT + "/meta").once("value"),
+    fbDb.ref(DB_ROOT + "/shopItems").once("value")
   ]).then(function(res){
     var remoteTx = res[0].val() || {};
     var remoteEv = res[1].val() || {};
     var metaVal = res[2].val();
+    var remoteShop = res[3].val() || {};
     var base = (metaVal && metaVal.json) ? JSON.parse(metaVal.json) : metaObject();
     base.transactions = Object.keys(remoteTx).map(function(k){ return remoteTx[k]; });
     base.events = Object.keys(remoteEv).map(function(k){ return remoteEv[k]; });
+    base.shopItems = Object.keys(remoteShop).map(function(k){ return remoteShop[k]; });
     base._savedAt = (metaVal && metaVal.savedAt) || new Date().toISOString();
     state = loadStateFromObj(base);
-    lastSyncedTx = {}; lastSyncedEv = {};
+    lastSyncedTx = {}; lastSyncedEv = {}; lastSyncedShop = {};
     Object.keys(remoteTx).forEach(function(k){ lastSyncedTx[k] = JSON.stringify(remoteTx[k]); });
     Object.keys(remoteEv).forEach(function(k){ lastSyncedEv[k] = JSON.stringify(remoteEv[k]); });
+    Object.keys(remoteShop).forEach(function(k){ lastSyncedShop[k] = JSON.stringify(remoteShop[k]); });
     lastMetaJson = (metaVal && metaVal.json) || "";
     saveSnapshot();
     persistLocal();
@@ -1296,18 +1338,21 @@ function forcePushAll(){
   if(!fbReady){ setSyncStatus("Firebase에 연결되지 않았어요."); return; }
   setSyncStatus("서버에 올리는 중…");
   setSyncBadge("syncing", "저장 중…");
-  var map = {}, emap = {};
+  var map = {}, emap = {}, smap = {};
   (state.transactions || []).forEach(function(t){ map[t.id] = fbClean(t); });
   (state.events || []).forEach(function(e){ emap[e.id] = fbClean(e); });
+  (state.shopItems || []).forEach(function(x){ smap[x.id] = fbClean(x); });
   var metaJson = JSON.stringify(metaObject());
   Promise.all([
     fbDb.ref(DB_ROOT + "/transactions").set(map),
     fbDb.ref(DB_ROOT + "/events").set(emap),
+    fbDb.ref(DB_ROOT + "/shopItems").set(smap),
     fbDb.ref(DB_ROOT + "/meta").set({ json: metaJson, savedAt: new Date().toISOString(), by: DEVICE_ID })
   ]).then(function(){
-    lastSyncedTx = {}; lastSyncedEv = {};
+    lastSyncedTx = {}; lastSyncedEv = {}; lastSyncedShop = {};
     Object.keys(map).forEach(function(k){ lastSyncedTx[k] = JSON.stringify(map[k]); });
     Object.keys(emap).forEach(function(k){ lastSyncedEv[k] = JSON.stringify(emap[k]); });
+    Object.keys(smap).forEach(function(k){ lastSyncedShop[k] = JSON.stringify(smap[k]); });
     lastMetaJson = metaJson;
     saveSnapshot();
     setSyncStatus("서버 덮어쓰기 완료 ✓");
@@ -1350,7 +1395,7 @@ var TABS = [
   {id:"card", label:"카드별 지출", s:"카드", ic:"💳"},
   {id:"schedule", label:"일정", s:"일정", ic:"🗓️"},
   {id:"caldiary", label:"가계부 달력", s:"달력", ic:"📅"},
-  {id:"loan", label:"대출 내역", s:"대출", ic:"🏦"}
+  {id:"shop", label:"사야할 것", s:"사야할것", ic:"🛒"}
 ];
 
 var state = null;
@@ -1358,6 +1403,13 @@ var state = null;
 /* 저축: "저축" 카테고리 지출 거래. 지출 합계/지출 그래프에서는 제외하고 저축 항목에만 합산 */
 var SAVING_CATEGORY = "저축";
 function isSaving(t){ return t.type === "expense" && t.category === SAVING_CATEGORY; }
+/* 고정비 판정: 거래에 fixedMode가 있으면 그것을 우선("fixed"/"variable"), 없으면 카테고리 설정을 따른다 */
+function isFixedTx(t){
+  if(t.type !== "expense") return false;
+  if(t.fixedMode === "variable") return false;
+  if(t.fixedMode === "fixed") return true;
+  return state.fixedCategories.indexOf(t.category) !== -1;
+}
 function ensureSavingCategory(st){
   if(!st.categories || !Array.isArray(st.categories.expense)) return st;
   if(st.categories.expense.indexOf(SAVING_CATEGORY) === -1) st.categories.expense.push(SAVING_CATEGORY);
@@ -1378,6 +1430,7 @@ function defaultState(){
     planItems: [],
     planEvents: {},
     events: [],
+    shopItems: [],
     chartExcludeCategories: []
   };
 }
@@ -1447,6 +1500,7 @@ function loadState(){
       e.order = Number(e.order) || 0;
       if(typeof e.endDate !== "string") e.endDate = "";
     });
+    parsed.shopItems = Array.isArray(parsed.shopItems) ? parsed.shopItems.filter(function(x){ return x && x.id; }) : [];
     parsed.loans.forEach(migrateLoan);
     parsed.transactions.forEach(function(t){ if(typeof t.account !== "string") t.account = ""; });
     return ensureSavingCategory(parsed);
@@ -1637,7 +1691,8 @@ function switchTab(tabId){
   var tab = TABS.filter(function(t){ return t.id === tabId; })[0];
   document.getElementById("tabTitle").textContent = tab ? tab.label : "";
   var monthNav = document.getElementById("monthNav");
-  monthNav.style.display = (tabId === "loan") ? "none" : "flex";
+  monthNav.style.display = (tabId === "shop") ? "none" : "flex";
+  document.getElementById("btnAdd").style.display = (tabId === "shop") ? "none" : "";
   var isCal = (tabId === "schedule" || tabId === "caldiary");
   document.getElementById("toggleAll").style.display = isCal ? "none" : "";
   document.getElementById("btnCardMenu").style.display = (tabId === "card" || tabId === "category") ? "flex" : "none";
@@ -1656,7 +1711,7 @@ function render(){
   else if(ui.activeTab === "card") renderCardTab();
   else if(ui.activeTab === "schedule") renderScheduleTab();
   else if(ui.activeTab === "caldiary") renderCalDiaryTab();
-  else if(ui.activeTab === "loan") renderLoanTab();
+  else if(ui.activeTab === "shop") renderShopTab();
 }
 
 function renderMonthNav(){
@@ -1703,7 +1758,7 @@ function txIcon(type){ return type === "income" ? "💰" : "💳"; }
 function txRowHtml(t, opts){
   opts = opts || {};
   var acc = state.accounts.filter(function(a){ return a.id === t.account; })[0];
-  var isFixed = t.type === "expense" && state.fixedCategories.indexOf(t.category) !== -1;
+  var isFixed = isFixedTx(t);
   var isRecurring = !!t.recurringId;
   var isSettleLinked = !!t.settleOfTxId;
   var hasMemo = !!(t.memo && String(t.memo).trim());
@@ -2102,6 +2157,7 @@ function renderHome(){
 
   renderHomeGoalBox();
   renderTrendChart();
+  renderLoanTab();   // 대출 관리 + 자금계획표 (홈 최하단)
 
   var recent = state.transactions.slice().sort(function(a,b){ return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); }).slice(0,8);
   var recentBox = document.getElementById("homeRecentList");
@@ -2365,7 +2421,7 @@ function renderBillBox(){
   transactionsInPeriod().forEach(function(t){
     if(t.type !== "expense" || !t.account) return;
     entered[t.account] = (entered[t.account]||0) + (Number(t.amount)||0);
-    if(state.fixedCategories.indexOf(t.category) !== -1)
+    if(isFixedTx(t))
       enteredFixed[t.account] = (enteredFixed[t.account]||0) + (Number(t.amount)||0);
   });
 
@@ -2435,7 +2491,7 @@ function renderCardTab(){
   allExpense.forEach(function(t){
     if(!t.account) return;
     byAcc[t.account] = (byAcc[t.account]||0) + (Number(t.amount)||0);
-    if(state.fixedCategories.indexOf(t.category) !== -1){
+    if(isFixedTx(t)){
       byAccFixed[t.account] = (byAccFixed[t.account]||0) + (Number(t.amount)||0);
     }
   });
@@ -2471,7 +2527,7 @@ function renderCardTab(){
   }
 
   // 카드별 고정비 표
-  var fixedTxs = allExpense.filter(function(t){ return state.fixedCategories.indexOf(t.category) !== -1; });
+  var fixedTxs = allExpense.filter(function(t){ return isFixedTx(t); });
   var fixedTotal = fixedTxs.reduce(function(s,t){ return s+(Number(t.amount)||0); }, 0);
   document.getElementById("fixedTotal").textContent = won(fixedTotal);
   var tbox = document.getElementById("fixedCardTables");
@@ -2545,7 +2601,7 @@ function accountSpentThisMonth(acc){
   return state.transactions.filter(function(t){
     if(t.type !== "expense" || t.account !== acc.id) return false;
     if(txMonthKey(t.date) !== monthKey) return false;
-    if(!acc.includeFixed && state.fixedCategories.indexOf(t.category) !== -1) return false;
+    if(!acc.includeFixed && isFixedTx(t)) return false;
     return true;
   }).reduce(function(s,t){ return s + (Number(t.amount)||0); }, 0);
 }
@@ -2775,6 +2831,77 @@ function fmtPlanNum(n){
 }
 
 /* ---- Main render: mini loan list + plan table ---- */
+/* ================= 사야할 것 탭 (부부 공유 · 항목 단위로 동기화) ================= */
+function shopRowHtml(x){
+  return '<div class="shoprow'+(x.done?' done':'')+'" data-id="'+x.id+'">'+
+    '<input type="checkbox" class="shopchk" '+(x.done?'checked':'')+'>'+
+    '<span class="shoptext">'+escapeHtml(x.text)+'</span>'+
+    '<button class="shopdel" title="삭제">×</button></div>';
+}
+
+function renderShopTab(){
+  var items = (state.shopItems || []).slice();
+  var todo = items.filter(function(x){ return !x.done; }).sort(function(a,b){ return (a.at||0)-(b.at||0); });
+  var done = items.filter(function(x){ return x.done; }).sort(function(a,b){ return (b.doneAt||0)-(a.doneAt||0); });
+  document.getElementById("shopCount").textContent = todo.length ? "· "+todo.length+"개" : "";
+  document.getElementById("shopTodoList").innerHTML = todo.length
+    ? todo.map(shopRowHtml).join("")
+    : '<div class="empty-state" style="padding:14px 4px;">사야할 게 없어요. 생각나면 바로 적어두세요.</div>';
+  document.getElementById("shopDoneBox").style.display = done.length ? "block" : "none";
+  document.getElementById("shopDoneCount").textContent = done.length ? "· "+done.length+"개" : "";
+  document.getElementById("shopDoneList").innerHTML = done.map(shopRowHtml).join("");
+}
+
+function shopAddItem(){
+  var inp = document.getElementById("shopInput");
+  var text = inp.value.trim();
+  if(!text) return;
+  state.shopItems.push({ id: uid(), text: text, done: false, at: Date.now() });
+  inp.value = "";
+  saveState();
+  renderShopTab();
+  inp.focus();
+}
+
+function shopFind(id){ return (state.shopItems || []).filter(function(x){ return x.id === id; })[0]; }
+
+function wireShopTab(){
+  document.getElementById("shopAddBtn").addEventListener("click", shopAddItem);
+  document.getElementById("shopInput").addEventListener("keydown", function(e){
+    if(e.key === "Enter"){ e.preventDefault(); shopAddItem(); }
+  });
+  ["shopTodoList","shopDoneList"].forEach(function(boxId){
+    document.getElementById(boxId).addEventListener("click", function(e){
+      var row = e.target.closest ? e.target.closest(".shoprow") : null;
+      if(!row) return;
+      var it = shopFind(row.dataset.id);
+      if(!it) return;
+      if(e.target.classList.contains("shopchk")){
+        it.done = e.target.checked;
+        if(it.done) it.doneAt = Date.now(); else delete it.doneAt;
+        saveState(); renderShopTab();
+      } else if(e.target.classList.contains("shopdel")){
+        state.shopItems = state.shopItems.filter(function(x){ return x.id !== it.id; });
+        saveState(); renderShopTab();
+      } else if(e.target.classList.contains("shoptext")){
+        var nt = window.prompt("항목 수정", it.text);
+        if(nt !== null && nt.trim() && nt.trim() !== it.text){
+          it.text = nt.trim();
+          saveState(); renderShopTab();
+        }
+      }
+    });
+  });
+  document.getElementById("shopClearDone").addEventListener("click", function(){
+    var n = state.shopItems.filter(function(x){ return x.done; }).length;
+    if(!n) return;
+    showConfirm("구매 완료 항목 비우기", "구매 완료로 체크한 "+n+"개 항목을 모두 삭제할까요?", function(){
+      state.shopItems = state.shopItems.filter(function(x){ return !x.done; });
+      saveState(); renderShopTab();
+    });
+  });
+}
+
 function renderLoanTab(){
   renderLoanMiniList();
   renderPlanTable();
@@ -3181,6 +3308,7 @@ function setTxType(type){
   var catSel = document.getElementById("fCategory");
   fillSelectOptions(catSel, state.categories[type], false);
   document.getElementById("fAccountField").style.display = type === "expense" ? "block" : "none";
+  document.getElementById("fFixedModeField").style.display = type === "expense" ? "block" : "none";
   if(type === "expense"){
     var accSel = document.getElementById("fAccount");
     accSel.innerHTML = '<option value="">선택 안함</option>' + state.accounts.map(function(a){ return '<option value="'+a.id+'">'+escapeHtml(a.name)+'</option>'; }).join("");
@@ -3189,6 +3317,16 @@ function setTxType(type){
   if(recField) recField.style.display = (type === "expense" && !ui.editingTxId) ? "block" : "none";
   var settleField = document.getElementById("fSettleField");
   if(settleField) settleField.style.display = (type === "expense") ? "block" : "none";
+  refreshFixedModeHint();
+}
+
+/* "카테고리 기준" 옵션에 현재 카테고리가 고정비인지 함께 표시 */
+function refreshFixedModeHint(){
+  var sel = document.getElementById("fFixedMode");
+  var cat = document.getElementById("fCategory").value;
+  if(!sel || !sel.options[0]) return;
+  var isFixedCat = state.fixedCategories.indexOf(cat) !== -1;
+  sel.options[0].textContent = "카테고리 기준 (" + (cat ? (isFixedCat ? "고정비" : "변동비") : "선택 전") + ")";
 }
 
 function openTxModal(tx, recurringScope){
@@ -3208,6 +3346,8 @@ function openTxModal(tx, recurringScope){
   if(tx) document.getElementById("fCategory").value = tx.category;
   document.getElementById("fAmount").value = tx ? tx.amount : "";
   document.getElementById("fMemo").value = tx ? (tx.memo||"") : "";
+  document.getElementById("fFixedMode").value = (tx && (tx.fixedMode === "fixed" || tx.fixedMode === "variable")) ? tx.fixedMode : "";
+  refreshFixedModeHint();
   if(defaultType === "expense"){
     document.getElementById("fAccount").value = tx ? (tx.account||"") : (ui.activeTab === "card" && ui.listFilter.card.acc ? ui.listFilter.card.acc : "");
   }
@@ -3267,6 +3407,8 @@ function saveTxFromModal(){
     memo: document.getElementById("fMemo").value.trim(),
     account: type === "expense" ? document.getElementById("fAccount").value : ""
   };
+  var fixedModeVal = type === "expense" ? document.getElementById("fFixedMode").value : "";
+  if(fixedModeVal === "fixed" || fixedModeVal === "variable") data.fixedMode = fixedModeVal;
   var recChk = document.getElementById("fRecurring");
   var makeRecurring = !ui.editingTxId && type === "expense" && recChk && recChk.checked;
   if(ui.editingRecurringScope === "all" && ui.editingRecurringId){
@@ -3289,7 +3431,10 @@ function saveTxFromModal(){
     }
   } else if(ui.editingTxId){
     var idx = state.transactions.findIndex(function(t){ return t.id===ui.editingTxId; });
-    if(idx>-1) state.transactions[idx] = Object.assign(state.transactions[idx], data);
+    if(idx>-1){
+      state.transactions[idx] = Object.assign(state.transactions[idx], data);
+      if(!data.fixedMode) delete state.transactions[idx].fixedMode;
+    }
   } else if(makeRecurring){
     var rid = uid();
     var dayNum = Number(date.slice(8,10)) || 1;
@@ -3412,6 +3557,7 @@ function addNewCategoryInline(){
   }
   fillSelectOptions(document.getElementById("fCategory"), state.categories[type], false);
   document.getElementById("fCategory").value = name;
+  refreshFixedModeHint();
   document.getElementById("newCatRow").classList.remove("show");
   document.getElementById("newCatInput").value = "";
 }
@@ -3792,7 +3938,6 @@ function resetAll(){
 
 /* ================= FAB routing ================= */
 function onFabClick(){
-  if(ui.activeTab === "loan"){ openPlanItemModal(null); return; }
   if(ui.activeTab === "schedule"){ openEventModal(null); return; }
   if(ui.activeTab === "caldiary"){
     openTxModal(null);
@@ -3954,6 +4099,7 @@ function wireEvents(){
   document.getElementById("confirmNewCat").addEventListener("click", addNewCategoryInline);
   document.getElementById("newCatInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addNewCategoryInline(); } });
   document.getElementById("btnSaveTx").addEventListener("click", saveTxFromModal);
+  document.getElementById("fCategory").addEventListener("change", refreshFixedModeHint);
   document.getElementById("fSettleToggle").addEventListener("change", function(){
     var wrap = document.getElementById("fSettleInputWrap");
     wrap.style.display = this.checked ? "block" : "none";
@@ -3973,6 +4119,8 @@ function wireEvents(){
     });
   });
   document.getElementById("btnAddLoanMini").addEventListener("click", function(){ openLoanModal(null); });
+  wireShopTab();
+  document.getElementById("btnAddPlanItem").addEventListener("click", function(){ openPlanItemModal(null); });
   document.getElementById("btnAddPrepay").addEventListener("click", addPrepayToCurrentLoan);
 
   document.querySelectorAll("#planItemTypeToggle button").forEach(function(b){
