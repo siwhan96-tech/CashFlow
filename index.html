@@ -137,6 +137,22 @@ input,select{font-family:inherit;}
 .scard.income .sval{color:var(--income);}
 .scard.expense .sval{color:var(--expense);}
 .scard.saving .sval{color:#0d9488;}
+#shopViewToggle button.active{background:var(--primary-dim);color:var(--primary);border-color:var(--primary);}
+.babyrow{display:flex;align-items:center;gap:12px;padding:12px 2px;border-top:1px solid var(--border);cursor:pointer;}
+.babyrow:first-child{border-top:none;}
+.babyrow .bmain{flex:1;min-width:0;}
+.babyrow .bname{font-size:15.5px;font-weight:700;line-height:1.35;word-break:break-all;}
+.babyrow .bsub{font-size:12.5px;color:var(--text-dim);margin-top:3px;line-height:1.4;word-break:break-all;}
+.babyrow .bmemo{font-size:12px;color:var(--text-dim);margin-top:2px;line-height:1.4;word-break:break-all;}
+.babyrow .bmemo a{color:var(--primary);text-decoration:none;font-weight:600;}
+.babyrow .bprice{font-weight:800;font-size:15px;white-space:nowrap;}
+.babyrow .bprice.zero{color:var(--text-dim);font-weight:600;}
+.bchip{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--primary-dim);color:var(--primary);margin-right:6px;vertical-align:1px;white-space:nowrap;}
+.bchip.bdate{background:#eef0f3;color:var(--text-dim);}
+.babyhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.babyhead .cardtitle{margin-bottom:0;}
+.babyhead .btotal{font-size:12px;color:var(--text-dim);font-weight:600;}
+.babybuy{border:1px solid var(--primary);color:var(--primary);background:none;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .shopaddrow{display:flex;gap:8px;margin-bottom:10px;}
 .shopaddrow input{flex:1;min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:10px;font-size:15px;background:var(--card);color:var(--text);}
 .shopaddrow button{white-space:nowrap;padding:0 16px;}
@@ -611,18 +627,44 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
       </div>
 
       <div class="tabpanel" id="panel-shop" data-tab="shop">
-        <div class="cardbox" style="margin-bottom:14px;">
-          <div class="cardtitle">사야할 것 <span id="shopCount" style="font-weight:600;color:var(--text-dim);font-size:12px;"></span></div>
-          <div class="shopaddrow">
-            <input type="text" id="shopInput" placeholder="사야할 것 입력 (예: 건전지, 수세미)" maxlength="60" autocomplete="off">
-            <button class="btn-ghost" id="shopAddBtn">추가</button>
-          </div>
-          <div id="shopTodoList"></div>
+        <div class="typetoggle" id="shopViewToggle">
+          <button data-view="list" class="active">🛒 쇼핑리스트</button>
+          <button data-view="baby">👶 호빵 용품</button>
         </div>
-        <div class="cardbox" id="shopDoneBox" style="display:none;">
-          <div class="cardtitle">구매 완료 <span id="shopDoneCount" style="font-weight:600;color:var(--text-dim);font-size:12px;"></span></div>
-          <div id="shopDoneList"></div>
-          <button class="btn-ghost" id="shopClearDone" style="width:100%;margin-top:10px;">구매 완료 항목 비우기</button>
+
+        <div id="shopListView">
+          <div class="cardbox" style="margin-bottom:14px;">
+            <div class="cardtitle">사야할 것 <span id="shopCount" style="font-weight:600;color:var(--text-dim);font-size:12px;"></span></div>
+            <div class="shopaddrow">
+              <input type="text" id="shopInput" placeholder="사야할 것 입력 (예: 건전지, 수세미)" maxlength="60" autocomplete="off">
+              <button class="btn-ghost" id="shopAddBtn">추가</button>
+            </div>
+            <div id="shopTodoList"></div>
+          </div>
+          <div class="cardbox" id="shopDoneBox" style="display:none;">
+            <div class="cardtitle">구매 완료 <span id="shopDoneCount" style="font-weight:600;color:var(--text-dim);font-size:12px;"></span></div>
+            <div id="shopDoneList"></div>
+            <button class="btn-ghost" id="shopClearDone" style="width:100%;margin-top:10px;">구매 완료 항목 비우기</button>
+          </div>
+        </div>
+
+        <div id="babyView" style="display:none;">
+          <div class="cardbox" style="margin-bottom:14px;border-left:3px solid var(--primary);">
+            <div class="babyhead"><div class="cardtitle">살 것 <span id="babyTodoCount" style="font-weight:600;color:var(--text-dim);font-size:12px;"></span></div></div>
+            <div class="shopaddrow">
+              <input type="text" id="babyQuickInput" placeholder="살 것 입력 (예: 아기샤워기)" maxlength="80" autocomplete="off">
+              <button class="btn-ghost" id="babyQuickAdd">추가</button>
+            </div>
+            <div id="babyTodoList"></div>
+          </div>
+          <div class="cardbox">
+            <div class="babyhead"><div class="cardtitle">구매 내역 <span id="babyBoughtCount" style="font-weight:600;color:var(--text-dim);font-size:12px;"></span></div><div class="btotal" id="babyTotal"></div></div>
+            <div id="babyBoughtList"></div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+              <button class="btn-ghost" id="btnBabyAddBought" style="flex:1;">+ 구매 기록 추가</button>
+              <button class="btn-ghost" id="btnBabyImport" style="flex:1;">📋 시트에서 가져오기</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -631,6 +673,69 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
 
   <button class="fab" id="btnAdd">+</button>
   <nav class="bottomnav" id="bottomNavList"></nav>
+</div>
+
+<!-- 호빵 용품 modal -->
+<div class="overlay" id="babyOverlay">
+  <div class="modal">
+    <h3 id="babyModalTitle">호빵 용품 추가</h3>
+    <div class="field">
+      <label>구분</label>
+      <input type="text" id="bKind" list="dlBabyKind" maxlength="30" placeholder="예: 유모차, 카시트" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>품명</label>
+      <input type="text" id="bName" maxlength="80" placeholder="예: 부가부 폭스2" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="checkrow"><input type="checkbox" id="bBought"> 구매 완료</label>
+    </div>
+    <div id="bBoughtWrap" style="display:none;">
+      <div class="field">
+        <label>구매 날짜</label>
+        <input type="date" id="bDate">
+      </div>
+      <div class="field">
+        <label>가격</label>
+        <input type="number" id="bPrice" inputmode="numeric" placeholder="0 (선물·나눔은 0)">
+      </div>
+    </div>
+    <div class="field">
+      <label>결제방법</label>
+      <input type="text" id="bMethod" list="dlBabyMethod" maxlength="20" placeholder="현금, 삼성카드 …" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>구매처</label>
+      <input type="text" id="bStore" list="dlBabyStore" maxlength="30" placeholder="당근, 네이버, 선물 …" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>비고 (선택)</label>
+      <input type="text" id="bMemo" maxlength="120" autocomplete="off">
+    </div>
+    <datalist id="dlBabyKind"></datalist>
+    <datalist id="dlBabyMethod"></datalist>
+    <datalist id="dlBabyStore"></datalist>
+    <div class="modalbtns">
+      <button class="btn-danger" id="bDelete" style="display:none;">삭제</button>
+      <button class="btn-ghost" id="bCancel">취소</button>
+      <button class="btn-primary" id="bSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 호빵 용품 가져오기 modal -->
+<div class="overlay" id="babyImportOverlay">
+  <div class="modal">
+    <h3>시트에서 가져오기</h3>
+    <div class="acchint" style="margin-bottom:10px;">엑셀/구글시트에서 표를 복사해(제목 행 포함) 아래에 붙여넣으세요. 구분·품명·가격·결제방법·구매처·비고 열을 읽고, 번호 열은 무시해요. 가격이 있으면 구매함(0원 포함), 비어 있으면 살 것으로 들어가요. 소계/합계 줄은 자동으로 건너뛰어요.</div>
+    <div class="field">
+      <textarea id="bImportText" rows="8" placeholder="여기에 붙여넣기"></textarea>
+    </div>
+    <div class="modalbtns">
+      <button class="btn-ghost" id="bImportCancel">취소</button>
+      <button class="btn-primary" id="bImportGo">가져오기</button>
+    </div>
+  </div>
 </div>
 
 <!-- Transaction modal -->
@@ -992,7 +1097,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-10-14-03";
+var APP_VERSION = "2026-10-22-02";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -1017,6 +1122,7 @@ var remoteRenderTimer = null;
 var lastSyncedTx = {};      // { txId: JSON 문자열 } — 서버와 마지막으로 맞춘 상태
 var lastSyncedEv = {};      // { eventId: JSON 문자열 }
 var lastSyncedShop = {};    // { shopItemId: JSON 문자열 }
+var lastSyncedBaby = {};    // { babyItemId: JSON 문자열 }
 var lastMetaJson = "";
 var metaLoaded = false;
 
@@ -1048,10 +1154,11 @@ function loadSnapshot(){
     lastSyncedTx = o.tx || o;      // 구버전 형식(거래만) 호환
     lastSyncedEv = o.ev || {};
     lastSyncedShop = o.shop || {};
-  }catch(e){ lastSyncedTx = {}; lastSyncedEv = {}; lastSyncedShop = {}; }
+    lastSyncedBaby = o.baby || {};
+  }catch(e){ lastSyncedTx = {}; lastSyncedEv = {}; lastSyncedShop = {}; lastSyncedBaby = {}; }
 }
 function saveSnapshot(){
-  try{ localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ tx: lastSyncedTx, ev: lastSyncedEv, shop: lastSyncedShop })); }catch(e){}
+  try{ localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ tx: lastSyncedTx, ev: lastSyncedEv, shop: lastSyncedShop, baby: lastSyncedBaby })); }catch(e){}
 }
 
 function setSyncBadge(status, text){
@@ -1146,13 +1253,15 @@ function reconcileAndWatch(){
   var txRef = fbDb.ref(DB_ROOT + "/transactions");
   var evRef = fbDb.ref(DB_ROOT + "/events");
   var shopRef = fbDb.ref(DB_ROOT + "/shopItems");
+  var babyRef = fbDb.ref(DB_ROOT + "/babyItems");
   var metaRef = fbDb.ref(DB_ROOT + "/meta");
   setSyncBadge("syncing", "동기화 중…");
 
-  Promise.all([txRef.once("value"), evRef.once("value"), shopRef.once("value")]).then(function(res){
+  Promise.all([txRef.once("value"), evRef.once("value"), shopRef.once("value"), babyRef.once("value")]).then(function(res){
     reconcileList(res[0].val() || {}, "transactions", lastSyncedTx, txRef);
     reconcileList(res[1].val() || {}, "events", lastSyncedEv, evRef);
     reconcileList(res[2].val() || {}, "shopItems", lastSyncedShop, shopRef);
+    reconcileList(res[3].val() || {}, "babyItems", lastSyncedBaby, babyRef);
     saveSnapshot();
     persistLocal();
     return metaRef.once("value");
@@ -1170,7 +1279,7 @@ function reconcileAndWatch(){
     var needsPush = syncBillTransactions();
     if(dedupeRecurringTransactions()) needsPush = true;
     if(needsPush){ persistLocal(); scheduleSyncPush(); }
-    startRealtime(txRef, evRef, metaRef, shopRef);
+    startRealtime(txRef, evRef, metaRef, shopRef, babyRef);
     render();
     flashBadge("ok", "✓ 동기화됨");
   }).catch(function(e){
@@ -1182,7 +1291,7 @@ function reconcileAndWatch(){
 function applyMeta(json){
   try{
     var m = JSON.parse(json);
-    var merged = Object.assign({}, m, { transactions: state.transactions, events: state.events, shopItems: state.shopItems, _savedAt: state._savedAt });
+    var merged = Object.assign({}, m, { transactions: state.transactions, events: state.events, shopItems: state.shopItems, babyItems: state.babyItems, _savedAt: state._savedAt });
     state = loadStateFromObj(merged);
     lastMetaJson = json;
     persistLocal();
@@ -1216,10 +1325,11 @@ function watchList(ref, key, snapMap){
   });
 }
 
-function startRealtime(txRef, evRef, metaRef, shopRef){
+function startRealtime(txRef, evRef, metaRef, shopRef, babyRef){
   watchList(txRef, "transactions", lastSyncedTx);
   watchList(evRef, "events", lastSyncedEv);
   watchList(shopRef, "shopItems", lastSyncedShop);
+  watchList(babyRef, "babyItems", lastSyncedBaby);
   metaRef.on("value", function(snap){
     var v = snap.val();
     if(!v || !v.json) return;
@@ -1271,8 +1381,10 @@ function pushChanges(){
   var jsh = pushList(fbDb.ref(DB_ROOT + "/shopItems"), "shopItems", lastSyncedShop);
   if(jt) jobs.push(jt);
   if(je) jobs.push(je);
+  var jbb = pushList(fbDb.ref(DB_ROOT + "/babyItems"), "babyItems", lastSyncedBaby);
   if(jsh) jobs.push(jsh);
-  if(jt || je || jsh) saveSnapshot();
+  if(jbb) jobs.push(jbb);
+  if(jt || je || jsh || jbb) saveSnapshot();
 
   var metaJson = JSON.stringify(metaObject());
   if(metaLoaded && metaJson !== lastMetaJson){
@@ -1305,22 +1417,26 @@ function forcePullAll(){
     fbDb.ref(DB_ROOT + "/transactions").once("value"),
     fbDb.ref(DB_ROOT + "/events").once("value"),
     fbDb.ref(DB_ROOT + "/meta").once("value"),
-    fbDb.ref(DB_ROOT + "/shopItems").once("value")
+    fbDb.ref(DB_ROOT + "/shopItems").once("value"),
+    fbDb.ref(DB_ROOT + "/babyItems").once("value")
   ]).then(function(res){
     var remoteTx = res[0].val() || {};
     var remoteEv = res[1].val() || {};
     var metaVal = res[2].val();
     var remoteShop = res[3].val() || {};
+    var remoteBaby = res[4].val() || {};
     var base = (metaVal && metaVal.json) ? JSON.parse(metaVal.json) : metaObject();
     base.transactions = Object.keys(remoteTx).map(function(k){ return remoteTx[k]; });
     base.events = Object.keys(remoteEv).map(function(k){ return remoteEv[k]; });
     base.shopItems = Object.keys(remoteShop).map(function(k){ return remoteShop[k]; });
+    base.babyItems = Object.keys(remoteBaby).map(function(k){ return remoteBaby[k]; });
     base._savedAt = (metaVal && metaVal.savedAt) || new Date().toISOString();
     state = loadStateFromObj(base);
-    lastSyncedTx = {}; lastSyncedEv = {}; lastSyncedShop = {};
+    lastSyncedTx = {}; lastSyncedEv = {}; lastSyncedShop = {}; lastSyncedBaby = {};
     Object.keys(remoteTx).forEach(function(k){ lastSyncedTx[k] = JSON.stringify(remoteTx[k]); });
     Object.keys(remoteEv).forEach(function(k){ lastSyncedEv[k] = JSON.stringify(remoteEv[k]); });
     Object.keys(remoteShop).forEach(function(k){ lastSyncedShop[k] = JSON.stringify(remoteShop[k]); });
+    Object.keys(remoteBaby).forEach(function(k){ lastSyncedBaby[k] = JSON.stringify(remoteBaby[k]); });
     lastMetaJson = (metaVal && metaVal.json) || "";
     saveSnapshot();
     persistLocal();
@@ -1338,21 +1454,24 @@ function forcePushAll(){
   if(!fbReady){ setSyncStatus("Firebase에 연결되지 않았어요."); return; }
   setSyncStatus("서버에 올리는 중…");
   setSyncBadge("syncing", "저장 중…");
-  var map = {}, emap = {}, smap = {};
+  var map = {}, emap = {}, smap = {}, bmap = {};
   (state.transactions || []).forEach(function(t){ map[t.id] = fbClean(t); });
   (state.events || []).forEach(function(e){ emap[e.id] = fbClean(e); });
   (state.shopItems || []).forEach(function(x){ smap[x.id] = fbClean(x); });
+  (state.babyItems || []).forEach(function(x){ bmap[x.id] = fbClean(x); });
   var metaJson = JSON.stringify(metaObject());
   Promise.all([
     fbDb.ref(DB_ROOT + "/transactions").set(map),
     fbDb.ref(DB_ROOT + "/events").set(emap),
     fbDb.ref(DB_ROOT + "/shopItems").set(smap),
+    fbDb.ref(DB_ROOT + "/babyItems").set(bmap),
     fbDb.ref(DB_ROOT + "/meta").set({ json: metaJson, savedAt: new Date().toISOString(), by: DEVICE_ID })
   ]).then(function(){
-    lastSyncedTx = {}; lastSyncedEv = {}; lastSyncedShop = {};
+    lastSyncedTx = {}; lastSyncedEv = {}; lastSyncedShop = {}; lastSyncedBaby = {};
     Object.keys(map).forEach(function(k){ lastSyncedTx[k] = JSON.stringify(map[k]); });
     Object.keys(emap).forEach(function(k){ lastSyncedEv[k] = JSON.stringify(emap[k]); });
     Object.keys(smap).forEach(function(k){ lastSyncedShop[k] = JSON.stringify(smap[k]); });
+    Object.keys(bmap).forEach(function(k){ lastSyncedBaby[k] = JSON.stringify(bmap[k]); });
     lastMetaJson = metaJson;
     saveSnapshot();
     setSyncStatus("서버 덮어쓰기 완료 ✓");
@@ -1431,6 +1550,7 @@ function defaultState(){
     planEvents: {},
     events: [],
     shopItems: [],
+    babyItems: [],
     chartExcludeCategories: []
   };
 }
@@ -1501,6 +1621,7 @@ function loadState(){
       if(typeof e.endDate !== "string") e.endDate = "";
     });
     parsed.shopItems = Array.isArray(parsed.shopItems) ? parsed.shopItems.filter(function(x){ return x && x.id; }) : [];
+    parsed.babyItems = Array.isArray(parsed.babyItems) ? parsed.babyItems.filter(function(x){ return x && x.id; }) : [];
     parsed.loans.forEach(migrateLoan);
     parsed.transactions.forEach(function(t){ if(typeof t.account !== "string") t.account = ""; });
     return ensureSavingCategory(parsed);
@@ -2840,6 +2961,16 @@ function shopRowHtml(x){
 }
 
 function renderShopTab(){
+  var v = ui.shopView === "baby" ? "baby" : "list";
+  document.querySelectorAll("#shopViewToggle button").forEach(function(b){
+    b.classList.toggle("active", b.dataset.view === v);
+  });
+  document.getElementById("shopListView").style.display = (v === "list") ? "" : "none";
+  document.getElementById("babyView").style.display = (v === "baby") ? "" : "none";
+  if(v === "baby") renderBabyView(); else renderShopList();
+}
+
+function renderShopList(){
   var items = (state.shopItems || []).slice();
   var todo = items.filter(function(x){ return !x.done; }).sort(function(a,b){ return (a.at||0)-(b.at||0); });
   var done = items.filter(function(x){ return x.done; }).sort(function(a,b){ return (b.doneAt||0)-(a.doneAt||0); });
@@ -2900,6 +3031,282 @@ function wireShopTab(){
       saveState(); renderShopTab();
     });
   });
+}
+
+/* ================= 호빵 용품 (구분/품명/가격/결제방법/구매처/비고 + 구매일 · 공유) ================= */
+var babyEditId = null;
+
+function babyByAt(a,b){ return (a.at||0) - (b.at||0); }
+function babySum(list){ return list.reduce(function(s,x){ return s + (Number(x.price)||0); }, 0); }
+function babyFind(id){ return (state.babyItems || []).filter(function(x){ return x.id === id; })[0]; }
+
+function babyShortDate(iso){
+  var p = iso.split("-");
+  var md = Number(p[1]) + "/" + Number(p[2]);
+  var yy = String(new Date().getFullYear());
+  return p[0] === yy ? md : p[0].slice(2) + "." + md;
+}
+
+function babyRowHtml(x){
+  var meta = [];
+  var pay = String(x.method || "").trim();
+  if(pay && pay !== "-") meta.push(escapeHtml(pay));
+  var store = String(x.store || "").trim();
+  if(store) meta.push(store === "선물" ? "🎁 선물" : escapeHtml(store));
+  var sub = (x.bought && x.date ? '<span class="bchip bdate">' + babyShortDate(x.date) + '</span>' : '') + meta.join(" · ");
+  var memo = String(x.memo || "").trim();
+  var memoHtml = "";
+  if(memo){
+    memoHtml = /^https?:\/\//i.test(memo)
+      ? '<a href="' + escapeHtml(memo) + '" target="_blank" rel="noopener">🔗 링크</a>'
+      : escapeHtml(memo);
+  }
+  var right;
+  if(x.bought){
+    var zero = !(Number(x.price) > 0);
+    right = '<div class="bprice' + (zero ? ' zero' : '') + '">' + won(x.price) + '</div>';
+  } else {
+    right = '<button class="babybuy" data-buy="' + x.id + '">구매</button>';
+  }
+  return '<div class="babyrow" data-id="' + x.id + '"><div class="bmain">' +
+    '<div class="bname">' + (x.kind ? '<span class="bchip">' + escapeHtml(x.kind) + '</span>' : '') + escapeHtml(x.name) + '</div>' +
+    (sub ? '<div class="bsub">' + sub + '</div>' : '') +
+    (memoHtml ? '<div class="bmemo">' + memoHtml + '</div>' : '') +
+    '</div>' + right + '</div>';
+}
+
+function renderBabyView(){
+  var items = state.babyItems || [];
+  var todo = items.filter(function(x){ return !x.bought; }).sort(babyByAt);
+  var bought = items.filter(function(x){ return x.bought; });
+
+  document.getElementById("babyTodoCount").textContent = todo.length ? "· " + todo.length + "개" : "";
+  document.getElementById("babyTodoList").innerHTML = todo.length
+    ? todo.map(babyRowHtml).join("")
+    : '<div class="empty-state" style="padding:14px 4px;">살 것이 없어요.</div>';
+
+  // 구매 내역: 날짜가 있는 건 최신순으로 위에, 날짜 없는 건(시트에서 가져온 것 등) 시트 순서대로 아래에
+  var dated = bought.filter(function(x){ return !!x.date; }).sort(function(a,b){
+    return b.date.localeCompare(a.date) || (b.at||0) - (a.at||0);
+  });
+  var undated = bought.filter(function(x){ return !x.date; }).sort(babyByAt);
+  var list = dated.concat(undated);
+  document.getElementById("babyBoughtCount").textContent = list.length ? "· " + list.length + "건" : "";
+  document.getElementById("babyTotal").textContent = list.length ? "합계 " + won(babySum(bought)) : "";
+  document.getElementById("babyBoughtList").innerHTML = list.length
+    ? list.map(babyRowHtml).join("")
+    : '<div class="empty-state" style="padding:14px 4px;">아직 구매 기록이 없어요.</div>';
+}
+
+function fillBabyDatalists(){
+  function uniq(key, seeds){
+    var seen = {}, out = [];
+    (seeds || []).concat((state.babyItems || []).map(function(x){ return x[key]; })).forEach(function(v){
+      v = String(v || "").trim();
+      if(v && v !== "-" && !seen[v]){ seen[v] = 1; out.push(v); }
+    });
+    return out;
+  }
+  function fill(id, arr){
+    document.getElementById(id).innerHTML = arr.map(function(v){ return '<option value="' + escapeHtml(v) + '"></option>'; }).join("");
+  }
+  fill("dlBabyKind", uniq("kind"));
+  fill("dlBabyMethod", uniq("method", ["현금","카드"]));
+  fill("dlBabyStore", uniq("store", ["당근","네이버","선물"]));
+}
+
+function openBabyModal(item, opts){
+  opts = opts || {};
+  babyEditId = item ? item.id : null;
+  fillBabyDatalists();
+  var bought = item ? (!!item.bought || !!opts.buy) : !!opts.bought;
+  document.getElementById("babyModalTitle").textContent = item ? (opts.buy && !item.bought ? "구매 처리" : "호빵 용품 수정") : (opts.bought ? "구매 기록 추가" : "호빵 용품 추가");
+  document.getElementById("bKind").value = item ? (item.kind || "") : "";
+  document.getElementById("bName").value = item ? (item.name || "") : "";
+  document.getElementById("bMethod").value = item ? (item.method || "") : "";
+  document.getElementById("bStore").value = item ? (item.store || "") : "";
+  document.getElementById("bMemo").value = item ? (item.memo || "") : "";
+  document.getElementById("bBought").checked = bought;
+  document.getElementById("bBoughtWrap").style.display = bought ? "block" : "none";
+  var dateVal = "";
+  if(item && item.bought) dateVal = item.date || "";
+  else if(bought) dateVal = todayIso();
+  document.getElementById("bDate").value = dateVal;
+  document.getElementById("bPrice").value = (item && item.bought) ? (Number(item.price) || 0) : "";
+  document.getElementById("bDelete").style.display = item ? "block" : "none";
+  openOverlay("babyOverlay");
+  if(opts.buy || (!item && opts.bought)) setTimeout(function(){ document.getElementById("bPrice").focus(); }, 60);
+}
+
+function saveBabyModal(){
+  var kind = document.getElementById("bKind").value.trim();
+  var name = document.getElementById("bName").value.trim();
+  if(!name){ showConfirm("입력 필요", "품명을 입력해주세요.", null, true); return; }
+  var bought = document.getElementById("bBought").checked;
+  var priceStr = document.getElementById("bPrice").value.trim();
+  if(bought && priceStr === ""){ showConfirm("입력 필요", "구매 완료 항목은 가격을 입력해주세요. (선물·나눔은 0)", null, true); return; }
+  var data = {
+    kind: kind, name: name,
+    method: document.getElementById("bMethod").value.trim(),
+    store: document.getElementById("bStore").value.trim(),
+    memo: document.getElementById("bMemo").value.trim(),
+    bought: bought
+  };
+  if(bought){
+    data.price = Math.max(0, Math.round(Number(priceStr) || 0));
+    data.date = document.getElementById("bDate").value || "";
+  }
+  if(babyEditId){
+    var it = babyFind(babyEditId);
+    if(it){
+      Object.assign(it, data);
+      if(!bought){ delete it.price; delete it.date; }
+    }
+  } else {
+    data.id = uid();
+    data.at = Date.now();
+    state.babyItems.push(data);
+  }
+  saveState();
+  closeOverlay("babyOverlay");
+  renderShopTab();
+}
+
+/* 엑셀/구글시트에서 복사한 탭 구분 텍스트 → 항목 목록 */
+function parseBabyPaste(text){
+  var lines = String(text || "").split(/\r?\n/).filter(function(l){ return l.trim() !== ""; });
+  if(!lines.length) return [];
+  var ALIAS = {
+    kind: ["구분","분류"], name: ["품명","품목","제품명"], price: ["가격","금액"],
+    method: ["결제방법","결제","결제수단"], store: ["구매처","구입처"], memo: ["비고","메모"],
+    date: ["구매일","구매날짜","구매 날짜","날짜"]
+  };
+  var first = lines[0].split("\t").map(function(c){ return c.trim(); });
+  var hasHeader = first.some(function(c){ return ALIAS.name.indexOf(c) !== -1; });
+  var map = null, start = 0;
+  if(hasHeader){
+    map = {};
+    first.forEach(function(c, i){
+      Object.keys(ALIAS).forEach(function(k){ if(ALIAS[k].indexOf(c) !== -1 && map[k] === undefined) map[k] = i; });
+    });
+    start = 1;
+  }
+  var out = [], base = Date.now();
+  for(var i = start; i < lines.length; i++){
+    var cells = lines[i].split("\t").map(function(c){ return c.trim(); });
+    var get;
+    if(map){
+      get = function(k){ return map[k] === undefined ? "" : (cells[map[k]] || ""); };
+    } else {
+      var off = cells.length >= 7 ? 1 : 0;   // 7열 이상이면 맨 앞은 번호 열로 보고 무시
+      var order = ["kind","name","price","method","store","memo"];
+      get = function(k){ var idx = order.indexOf(k); return idx === -1 ? "" : (cells[off + idx] || ""); };
+    }
+    var kind = get("kind"), name = get("name");
+    if(/^(소계|합계|총계|총합)$/.test(kind) || /^(소계|합계|총계|총합)$/.test(name)) continue;
+    if(!name && !kind) continue;
+    if(!name){ name = kind; kind = ""; }
+    var ps = get("price").replace(/[₩￦,\s원]/g, "");
+    var hasPrice = ps !== "" && !isNaN(Number(ps));
+    var d = get("date").replace(/\s/g, "").match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/);
+    var it = {
+      id: uid() + i, kind: kind, name: name,
+      method: get("method"), store: get("store"), memo: get("memo"),
+      bought: hasPrice, at: base + i
+    };
+    if(hasPrice){
+      it.price = Math.max(0, Math.round(Number(ps)));
+      it.date = d ? (d[1] + "-" + pad2(Number(d[2])) + "-" + pad2(Number(d[3]))) : "";
+    }
+    out.push(it);
+  }
+  return out;
+}
+
+function babyItemKey(x){
+  return [x.kind || "", x.name || "", x.bought ? String(x.price) : "", x.method || "", x.store || ""].join("|");
+}
+
+function runBabyImport(){
+  var parsed = parseBabyPaste(document.getElementById("bImportText").value);
+  if(!parsed.length){
+    showConfirm("가져올 항목 없음", "붙여넣은 내용에서 항목을 찾지 못했어요. 시트에서 표를 복사했는지 확인해주세요.", null, true);
+    return;
+  }
+  var existing = {};
+  (state.babyItems || []).forEach(function(x){ existing[babyItemKey(x)] = true; });
+  var fresh = parsed.filter(function(x){ return !existing[babyItemKey(x)]; });
+  var skipped = parsed.length - fresh.length;
+  if(!fresh.length){
+    showConfirm("이미 있는 항목", "붙여넣은 " + parsed.length + "개 항목이 모두 이미 등록되어 있어요.", null, true);
+    return;
+  }
+  var nb = fresh.filter(function(x){ return x.bought; }).length;
+  var total = babySum(fresh.filter(function(x){ return x.bought; }));
+  showConfirm("시트에서 가져오기",
+    fresh.length + "개 항목을 가져올까요? (구매함 " + nb + "개 · 살 것 " + (fresh.length - nb) + "개 · 구매 금액 합계 " + won(total) + (skipped ? " · 이미 있어 건너뜀 " + skipped + "개" : "") + ")",
+    function(){
+      fresh.forEach(function(x){ state.babyItems.push(x); });
+      saveState();
+      closeOverlay("babyImportOverlay");
+      renderShopTab();
+    });
+}
+
+function wireBabyView(){
+  document.querySelectorAll("#shopViewToggle button").forEach(function(b){
+    b.addEventListener("click", function(){ ui.shopView = b.dataset.view; renderShopTab(); });
+  });
+  function quickAdd(){
+    var inp = document.getElementById("babyQuickInput");
+    var text = inp.value.trim();
+    if(!text) return;
+    state.babyItems.push({ id: uid(), kind: "", name: text, method: "", store: "", memo: "", bought: false, at: Date.now() });
+    inp.value = "";
+    saveState();
+    renderShopTab();
+    inp.focus();
+  }
+  document.getElementById("babyQuickAdd").addEventListener("click", quickAdd);
+  document.getElementById("babyQuickInput").addEventListener("keydown", function(e){
+    if(e.key === "Enter"){ e.preventDefault(); quickAdd(); }
+  });
+  document.getElementById("btnBabyAddBought").addEventListener("click", function(){ openBabyModal(null, { bought: true }); });
+  document.getElementById("btnBabyImport").addEventListener("click", function(){
+    document.getElementById("bImportText").value = "";
+    openOverlay("babyImportOverlay");
+  });
+  ["babyTodoList","babyBoughtList"].forEach(function(id){
+    document.getElementById(id).addEventListener("click", function(e){
+      if(e.target.closest && e.target.closest("a")) return;   // 링크는 그대로 열기
+      var row = e.target.closest ? e.target.closest(".babyrow") : null;
+      if(!row) return;
+      var it = babyFind(row.dataset.id);
+      if(!it) return;
+      var buy = e.target.classList && e.target.classList.contains("babybuy");
+      openBabyModal(it, { buy: buy });
+    });
+  });
+  document.getElementById("bBought").addEventListener("change", function(){
+    document.getElementById("bBoughtWrap").style.display = this.checked ? "block" : "none";
+    var dateEl = document.getElementById("bDate");
+    var it = babyEditId ? babyFind(babyEditId) : null;
+    if(this.checked && !dateEl.value && !(it && it.bought)) dateEl.value = todayIso();
+  });
+  document.getElementById("bSave").addEventListener("click", saveBabyModal);
+  document.getElementById("bCancel").addEventListener("click", function(){ closeOverlay("babyOverlay"); });
+  document.getElementById("bDelete").addEventListener("click", function(){
+    var it = babyEditId ? babyFind(babyEditId) : null;
+    if(!it) return;
+    showConfirm("항목 삭제", '"' + it.name + '" 항목을 삭제할까요?', function(){
+      state.babyItems = state.babyItems.filter(function(x){ return x.id !== it.id; });
+      saveState();
+      closeOverlay("babyOverlay");
+      renderShopTab();
+    });
+  });
+  document.getElementById("bImportGo").addEventListener("click", runBabyImport);
+  document.getElementById("bImportCancel").addEventListener("click", function(){ closeOverlay("babyImportOverlay"); });
 }
 
 function renderLoanTab(){
@@ -4120,6 +4527,7 @@ function wireEvents(){
   });
   document.getElementById("btnAddLoanMini").addEventListener("click", function(){ openLoanModal(null); });
   wireShopTab();
+  wireBabyView();
   document.getElementById("btnAddPlanItem").addEventListener("click", function(){ openPlanItemModal(null); });
   document.getElementById("btnAddPrepay").addEventListener("click", addPrepayToCurrentLoan);
 
