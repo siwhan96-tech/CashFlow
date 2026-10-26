@@ -162,6 +162,8 @@ table.bprev{border-collapse:collapse;font-size:12px;min-width:100%;}
 table.bprev th,table.bprev td{border:1px solid var(--border);padding:4px 6px;text-align:left;white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis;}
 table.bprev th select{font-size:12px;padding:3px;max-width:100px;}
 table.bprev tr.hdr td{color:var(--text-dim);background:#f7f7fa;}
+.acctotal{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--border);margin-top:12px;padding-top:10px;font-weight:800;font-size:14px;}
+.acctotal small{display:block;font-weight:500;font-size:11.5px;color:var(--text-dim);margin-top:2px;}
 .babyhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
 .babyhead .cardtitle{margin-bottom:0;}
 .babyhead .btotal{font-size:12px;color:var(--text-dim);font-weight:600;}
@@ -1126,7 +1128,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-10-22-03";
+var APP_VERSION = "2026-10-26-01";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -2640,11 +2642,21 @@ function renderCardTab(){
   // account breakdown (only txs assigned to an account) - split into 고정비/변동생활비
   var byAcc = {};
   var byAccFixed = {};
-  allExpense.forEach(function(t){
-    if(!t.account) return;
-    byAcc[t.account] = (byAcc[t.account]||0) + (Number(t.amount)||0);
+  // 저축은 소비가 아니므로 카드/계좌별 합계에서 제외 (홈 '지출'과 같은 기준)
+  var spendExpense = allExpense.filter(function(t){ return !isSaving(t); });
+  var noAcc = { total: 0, fixed: 0 };      // 계좌를 지정하지 않은 지출 (현금 등)
+  var settleSum = 0;
+  spendExpense.forEach(function(t){
+    var amt = Number(t.amount)||0;
+    if(t.settleAmount > 0) settleSum += Number(t.settleAmount)||0;
+    if(!t.account){
+      noAcc.total += amt;
+      if(isFixedTx(t)) noAcc.fixed += amt;
+      return;
+    }
+    byAcc[t.account] = (byAcc[t.account]||0) + amt;
     if(isFixedTx(t)){
-      byAccFixed[t.account] = (byAccFixed[t.account]||0) + (Number(t.amount)||0);
+      byAccFixed[t.account] = (byAccFixed[t.account]||0) + amt;
     }
   });
   var billMk = monthKeyFromDate(ui.viewDate.getFullYear(), ui.viewDate.getMonth());
@@ -2657,6 +2669,10 @@ function renderCardTab(){
     var hasBill = useBills && Number((a.bills||{})[billMk]) > 0;
     return {name:a.name, total:total, fixed:fixed, variable:variable, hasBill:hasBill};
   }).sort(function(a,b){ return b.total-a.total; });
+  if(noAcc.total > 0){
+    accEntries.push({name:"계좌 미지정 (현금 등)", total:noAcc.total, fixed:noAcc.fixed, variable:noAcc.total-noAcc.fixed, hasBill:false});
+  }
+  var accGrand = accEntries.reduce(function(s,e){ return s + e.total; }, 0);
 
   document.getElementById("accLegendKey").innerHTML =
     '<span><i class="dot fixed"></i>고정비</span><span><i class="dot variable"></i>변동비</span>';
@@ -2675,11 +2691,12 @@ function renderCardTab(){
         '<div class="accbar-track"><div class="accbar-fill-wrap" style="width:100%"><div class="accbar-fill-fixed" style="width:'+fixedPct+'%"></div><div class="accbar-fill-variable" style="width:'+varPct+'%"></div></div></div>'+
         '<div class="accbar-sub"><span>'+subs.join('</span><span>')+'</span></div>'+
       '</div>';
-    }).join("");
+    }).join("") +
+    '<div class="acctotal"><span>합계<small>홈 "지출"과 같은 기준 (저축 제외'+(settleSum > 0 ? ', n빵 정산분 '+won(settleSum)+' 포함' : '')+')</small></span><span>'+won(accGrand)+'</span></div>';
   }
 
   // 카드별 고정비 표
-  var fixedTxs = allExpense.filter(function(t){ return isFixedTx(t); });
+  var fixedTxs = spendExpense.filter(function(t){ return isFixedTx(t); });
   var fixedTotal = fixedTxs.reduce(function(s,t){ return s+(Number(t.amount)||0); }, 0);
   document.getElementById("fixedTotal").textContent = won(fixedTotal);
   var tbox = document.getElementById("fixedCardTables");
