@@ -1131,7 +1131,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-10-26-03";
+var APP_VERSION = "2026-11-03-01";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -1168,7 +1168,7 @@ var DEVICE_ID = (function(){
   }catch(e){ return "tmp"+Math.random().toString(36).slice(2,8); }
 })();
 
-var META_KEYS = ["startingBalance","categories","fixedCategories","chartExcludeCategories","accounts","loans","recurring","planItems","planEvents"];
+var META_KEYS = ["startingBalance","categories","fixedCategories","chartExcludeCategories","categoryColors","accounts","loans","recurring","planItems","planEvents"];
 
 function fbClean(o){ try{ return JSON.parse(JSON.stringify(o)); }catch(e){ return o; } }
 
@@ -1533,13 +1533,51 @@ var DEFAULT_CATEGORIES = {
   expense: ["식비","교통","쇼핑","문화/여가","의료/건강","주거/관리비","보험","구독서비스","교육","기타지출"]
 };
 var DEFAULT_FIXED = ["보험","구독서비스"];
-var CHART_COLORS = ["#4f46e5","#f59e0b","#10b981","#ef4444","#0ea5e9","#a855f7","#84cc16","#ec4899","#78716c","#0d9488"];
+var CHART_COLORS = ["#4f46e5","#f59e0b","#10b981","#ef4444","#0ea5e9","#a855f7","#84cc16","#ec4899","#78716c","#0d9488",
+  "#f97316","#6366f1","#14b8a6","#e11d48","#65a30d","#0891b2","#c026d3","#ca8a04","#2563eb","#db2777","#059669","#7c3aed","#b45309","#475569"];
+var SAVING_COLOR = "#0d9488";   // 저축은 홈의 저축 카드/막대와 같은 청록색으로 고정
 
-/* 같은 카테고리 이름은 어디서든(카드별 표 등) 같은 색으로 보이도록 이름 기반으로 색을 고정 배정 */
+/* 카테고리별 색을 한 번 배정하면 계속 유지한다 (월별 지출 순위와 무관).
+   state.categoryColors = { 카테고리명: 색 } — 기기 간 동기화됨.
+   새 카테고리는 아직 안 쓰인 색부터 차례로 배정하고, 색이 모자라면 가장 덜 쓰인 색을 재사용한다. */
+function ensureCategoryColors(st){
+  if(!st.categoryColors || typeof st.categoryColors !== "object" || Array.isArray(st.categoryColors)) st.categoryColors = {};
+  var map = st.categoryColors;
+  var names = [];
+  ["expense","income"].forEach(function(g){ ((st.categories || {})[g] || []).forEach(function(n){ names.push(n); }); });
+  (st.transactions || []).forEach(function(t){ if(t.category) names.push(t.category); });
+  var active = {};
+  names.forEach(function(n){ active[n] = true; });
+  if(!map[SAVING_CATEGORY]) map[SAVING_CATEGORY] = SAVING_COLOR;
+  var count = {};
+  CHART_COLORS.forEach(function(c){ count[c] = 0; });
+  Object.keys(map).forEach(function(n){
+    if(active[n] || n === SAVING_CATEGORY) count[map[n]] = (count[map[n]] || 0) + 1;
+  });
+  var done = {};
+  names.forEach(function(n){
+    if(map[n] || done[n]) return;
+    done[n] = true;
+    var best = CHART_COLORS[0], bestCnt = 1e9;
+    for(var i = 0; i < CHART_COLORS.length; i++){
+      var c = CHART_COLORS[i];
+      if(count[c] < bestCnt){ best = c; bestCnt = count[c]; if(bestCnt === 0) break; }
+    }
+    map[n] = best;
+    count[best] = (count[best] || 0) + 1;
+  });
+  return st;
+}
+
+var colorSaveTimer = null;
 function categoryColor(name){
-  var h = 0;
-  for(var i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) >>> 0;
-  return CHART_COLORS[h % CHART_COLORS.length];
+  if(!state || !state.categoryColors) return CHART_COLORS[0];
+  if(!state.categoryColors[name]){
+    ensureCategoryColors(state);
+    if(!state.categoryColors[name]) state.categoryColors[name] = CHART_COLORS[0];
+    if(!colorSaveTimer) colorSaveTimer = setTimeout(function(){ colorSaveTimer = null; saveState(); }, 400);
+  }
+  return state.categoryColors[name];
 }
 
 var TABS = [
@@ -1585,6 +1623,7 @@ function defaultState(){
     events: [],
     shopItems: [],
     babyItems: [],
+    categoryColors: {},
     chartExcludeCategories: []
   };
 }
@@ -1620,7 +1659,7 @@ function migrateLoan(l){
 function loadState(){
   try{
     var raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return ensureSavingCategory(defaultState());
+    if(!raw) return ensureCategoryColors(ensureSavingCategory(defaultState()));
     var parsed = JSON.parse(raw);
     var d = defaultState();
     parsed.startingBalance = Number(parsed.startingBalance)||0;
@@ -1658,9 +1697,9 @@ function loadState(){
     parsed.babyItems = Array.isArray(parsed.babyItems) ? parsed.babyItems.filter(function(x){ return x && x.id; }) : [];
     parsed.loans.forEach(migrateLoan);
     parsed.transactions.forEach(function(t){ if(typeof t.account !== "string") t.account = ""; });
-    return ensureSavingCategory(parsed);
+    return ensureCategoryColors(ensureSavingCategory(parsed));
   }catch(e){
-    return ensureSavingCategory(defaultState());
+    return ensureCategoryColors(ensureSavingCategory(defaultState()));
   }
 }
 
@@ -2467,7 +2506,7 @@ function renderCategoryChart(txList, isInc, fullList){
   legend.innerHTML = entries.map(function(e,i){
     var pct = total ? Math.round(e.amt/total*100) : 0;
     return '<div class="legend-row">'+
-      '<span class="legend-dot" style="background:'+CHART_COLORS[i%CHART_COLORS.length]+'"></span>'+
+      '<span class="legend-dot" style="background:'+categoryColor(e.name)+'"></span>'+
       '<span class="legend-name">'+escapeHtml(e.name)+'</span>'+
       '<span class="legend-pct">'+pct+'%</span>'+
       '<span class="legend-amt">'+won(e.amt)+'</span>'+
@@ -2479,7 +2518,7 @@ function renderCategoryChart(txList, isInc, fullList){
     type: "doughnut",
     data: {
       labels: entries.map(function(e){ return e.name; }),
-      datasets: [{ data: entries.map(function(e){ return e.amt; }), backgroundColor: entries.map(function(_,i){ return CHART_COLORS[i%CHART_COLORS.length]; }), borderWidth:0 }]
+      datasets: [{ data: entries.map(function(e){ return e.amt; }), backgroundColor: entries.map(function(e){ return categoryColor(e.name); }), borderWidth:0 }]
     },
     options: { responsive:true, maintainAspectRatio:false, cutout:"68%", plugins:{ legend:{ display:false } } }
   });
@@ -4354,6 +4393,10 @@ function saveRenameCat(){
   if(idx !== -1) state.categories[ctx.group][idx] = newName;
   state.fixedCategories = state.fixedCategories.map(function(x){ return x===ctx.oldName ? newName : x; });
   state.chartExcludeCategories = state.chartExcludeCategories.map(function(x){ return x===ctx.oldName ? newName : x; });
+  if(state.categoryColors && state.categoryColors[ctx.oldName]){
+    state.categoryColors[newName] = state.categoryColors[ctx.oldName];
+    delete state.categoryColors[ctx.oldName];
+  }
   (state.transactions||[]).forEach(function(t){ if(t.category === ctx.oldName) t.category = newName; });
   (state.recurring||[]).forEach(function(r){ if(r.category === ctx.oldName) r.category = newName; });
   saveState();
