@@ -230,6 +230,10 @@ table.bprev tr.hdr td{color:var(--text-dim);background:#f7f7fa;}
   width:18px;height:18px;border-radius:50%;background:rgba(79,70,229,.1);border:none;
   font-size:10px;display:flex;align-items:center;justify-content:center;padding:0;
 }
+.accchip .accedit{
+  width:18px;height:18px;border-radius:50%;background:rgba(79,70,229,.1);border:none;
+  font-size:10px;display:flex;align-items:center;justify-content:center;padding:0;
+}
 .accgoalbadge{
   font-size:10.5px;font-weight:800;background:#fff;color:var(--primary);border-radius:10px;padding:1px 7px;
 }
@@ -618,7 +622,7 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
         </div>
         <div class="cardbox" style="margin-top:18px;">
           <div class="collapse-head" id="accBoxHead">
-            <div class="cardtitle" style="margin-bottom:0;">⚙️ 카드/계좌 관리 <span style="font-weight:400;font-size:11.5px;color:var(--text-dim);">(추가·삭제·실적 목표)</span></div>
+            <div class="cardtitle" style="margin-bottom:0;">⚙️ 카드/계좌 관리 <span style="font-weight:400;font-size:11.5px;color:var(--text-dim);">(추가·삭제·이름변경·실적 목표)</span></div>
             <span class="arrow">▼</span>
           </div>
           <div id="accBoxBody" style="display:none;padding-top:12px;">
@@ -1131,7 +1135,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-11-03-01";
+var APP_VERSION = "2026-11-24-01";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -2561,6 +2565,21 @@ function renderHomeGoalBox(){
   document.getElementById("homeGoalList").innerHTML = goalRowsHtml(goalAccs);
 }
 
+/* 카드/계좌 이름 변경: 내역은 계좌 id로 연결돼 있어서 기존 내역·카드값·실적 목표가 그대로 유지된다 */
+function renameAccount(id){
+  var acc = state.accounts.filter(function(a){ return a.id === id; })[0];
+  if(!acc) return;
+  var v = window.prompt("카드/계좌 이름을 바꿔요", acc.name);
+  if(v === null) return;
+  v = v.trim().slice(0, 20);
+  if(!v || v === acc.name) return;
+  var dup = state.accounts.some(function(a){ return a.id !== id && a.name.toLowerCase() === v.toLowerCase(); });
+  if(dup){ showConfirm("이미 있는 이름", '"'+v+'" 카드/계좌가 이미 있어요. 다른 이름을 입력해주세요.', null, true); return; }
+  acc.name = v;
+  saveState();
+  render();
+}
+
 function renderAccList(){
   var box = document.getElementById("accList");
   if(state.accounts.length === 0){
@@ -2574,12 +2593,16 @@ function renderAccList(){
         var met = spent >= a.goalAmount;
         goalBadge = '<span class="accgoalbadge'+(met?' met':'')+'">'+pct+'%</span>';
       }
-      return '<div class="accchip" data-id="'+a.id+'">'+escapeHtml(a.name)+goalBadge+
+      return '<div class="accchip" data-id="'+a.id+'"><span class="accname" data-id="'+a.id+'" style="cursor:pointer;" title="이름 변경">'+escapeHtml(a.name)+'</span>'+goalBadge+
+        '<button class="accedit" data-id="'+a.id+'" title="이름 변경">✏️</button>'+
         '<button class="accgoal" data-id="'+a.id+'" title="실적 목표 설정">🎯</button>'+
         '<button class="accdel" data-id="'+a.id+'">×</button></div>';
     }).join("");
     box.querySelectorAll(".accgoal").forEach(function(btn){
       btn.addEventListener("click", function(){ openAccGoalModal(btn.dataset.id); });
+    });
+    box.querySelectorAll(".accedit, .accname").forEach(function(el){
+      el.addEventListener("click", function(){ renameAccount(el.dataset.id); });
     });
     box.querySelectorAll(".accdel").forEach(function(btn){
       btn.addEventListener("click", function(){
