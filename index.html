@@ -849,6 +849,16 @@ table.plantable .plan-rowtag{font-size:9.5px;color:var(--primary);background:var
     <div class="field">
       <label class="checkfield"><input type="checkbox" id="agIncludeFixed"> 반복 고정비도 실적에 포함</label>
     </div>
+    <div class="field">
+      <label>실적에서 제외할 항목 (이 카드만 적용)</label>
+      <input type="text" id="agExcludeWords" placeholder="키워드 입력, 쉼표로 구분 (예: 다이소, 쿠팡, 관리비)" autocomplete="off">
+      <div class="acchint" style="margin-top:4px;">내역의 메모나 카테고리 이름에 이 글자가 들어 있으면 이 카드 실적에서 빠져요.</div>
+    </div>
+    <div class="field">
+      <label>제외할 카테고리 선택</label>
+      <div id="agExcludeCats" style="max-height:130px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:6px 10px;"></div>
+    </div>
+    <div class="acchint" id="agExcludePreview" style="margin-bottom:10px;"></div>
     <div class="modalbtns">
       <button class="btn-ghost" id="btnCancelAccGoal">취소</button>
       <button class="btn-primary" id="btnSaveAccGoal">저장</button>
@@ -1135,7 +1145,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-11-24-01";
+var APP_VERSION = "2026-11-24-02";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -1677,6 +1687,8 @@ function loadState(){
     parsed.accounts.forEach(function(a){
       a.goalAmount = Number(a.goalAmount) || 0;
       a.includeFixed = a.includeFixed !== false;
+      a.excludeCats = Array.isArray(a.excludeCats) ? a.excludeCats.filter(function(x){ return typeof x === "string" && x; }) : [];
+      a.excludeWords = Array.isArray(a.excludeWords) ? a.excludeWords.filter(function(x){ return typeof x === "string" && x.trim(); }) : [];
       a.bills = (a.bills && typeof a.bills === "object") ? a.bills : {};
     });
     parsed.loans = Array.isArray(parsed.loans) ? parsed.loans : [];
@@ -2535,13 +2547,14 @@ function goalRowsHtml(goalAccs){
     var pct = Math.min(100, Math.round(spent / a.goalAmount * 100));
     var met = spent >= a.goalAmount;
     var remain = Math.max(0, a.goalAmount - spent);
+    var exc = accountExcludedThisMonth(a);
     return '<div class="goalrow">'+
       '<div class="goalrow-top"><span class="nm">'+escapeHtml(a.name)+'</span>'+
       '<span class="amt"><b>'+won(spent)+'</b> / '+won(a.goalAmount)+'</span></div>'+
       '<div class="goaltrack"><div class="goalfill'+(met?' met':'')+'" style="width:'+pct+'%"></div></div>'+
       '<div class="goalsub">'+
       (met ? '<span class="met-tag">✓ 실적 채움</span>' : '<span class="left-tag">'+won(remain)+' 더 쓰면 채워요</span>')+
-      '<span>'+pct+'%'+(a.includeFixed ? '' : ' · 고정비 제외')+'</span>'+
+      '<span>'+pct+'%'+(a.includeFixed ? '' : ' · 고정비 제외')+(exc.count ? ' · 실적 제외 '+won(exc.sum) : '')+'</span>'+
       '</div></div>';
   }).join("");
 }
@@ -2820,24 +2833,52 @@ function addAccount(name){
   render();
 }
 
-function updateAccountGoal(id, goalAmount, includeFixed){
+function updateAccountGoal(id, goalAmount, includeFixed, ex){
   var acc = state.accounts.filter(function(a){ return a.id === id; })[0];
   if(!acc) return;
   acc.goalAmount = Math.max(0, Number(goalAmount) || 0);
   acc.includeFixed = !!includeFixed;
+  if(ex){ acc.excludeWords = ex.words || []; acc.excludeCats = ex.cats || []; }
   saveState();
   render();
 }
 
-function accountSpentThisMonth(acc){
+/* 이 카드의 실적에서 제외되는 거래인가: 제외 카테고리에 속하거나, 내용(메모)·카테고리 이름에 제외 키워드가 들어 있으면 제외 */
+function isExcludedFromGoal(acc, t){
+  if(acc.excludeCats && acc.excludeCats.indexOf(t.category) !== -1) return true;
+  if(acc.excludeWords && acc.excludeWords.length){
+    var hay = (String(t.memo || "") + " " + String(t.category || "")).toLowerCase();
+    for(var i = 0; i < acc.excludeWords.length; i++){
+      var w = String(acc.excludeWords[i]).trim().toLowerCase();
+      if(w && hay.indexOf(w) !== -1) return true;
+    }
+  }
+  return false;
+}
+
+function accountMonthTxs(acc){
   var now = new Date();
   var monthKey = monthKeyFromDate(now.getFullYear(), now.getMonth());
   return state.transactions.filter(function(t){
-    if(t.type !== "expense" || t.account !== acc.id) return false;
-    if(txMonthKey(t.date) !== monthKey) return false;
+    return t.type === "expense" && t.account === acc.id && txMonthKey(t.date) === monthKey;
+  });
+}
+
+function accountSpentThisMonth(acc){
+  return accountMonthTxs(acc).filter(function(t){
     if(!acc.includeFixed && isFixedTx(t)) return false;
+    if(isExcludedFromGoal(acc, t)) return false;
     return true;
   }).reduce(function(s,t){ return s + (Number(t.amount)||0); }, 0);
+}
+
+function accountExcludedThisMonth(acc){
+  var sum = 0, n = 0;
+  accountMonthTxs(acc).forEach(function(t){
+    if(!acc.includeFixed && isFixedTx(t)) return;       // 고정비 제외 설정으로 이미 빠진 건은 중복 집계하지 않음
+    if(isExcludedFromGoal(acc, t)){ sum += Number(t.amount)||0; n++; }
+  });
+  return { sum: sum, count: n };
 }
 
 function openAccGoalModal(accId){
@@ -2847,14 +2888,44 @@ function openAccGoalModal(accId){
   document.getElementById("accGoalModalTitle").textContent = acc.name + " 실적 목표";
   document.getElementById("agAmount").value = acc.goalAmount > 0 ? acc.goalAmount : "";
   document.getElementById("agIncludeFixed").checked = acc.includeFixed !== false;
+  document.getElementById("agExcludeWords").value = (acc.excludeWords || []).join(", ");
+  var cats = state.categories.expense.filter(function(c){ return c !== SAVING_CATEGORY; });
+  (acc.excludeCats || []).forEach(function(c){ if(cats.indexOf(c) === -1) cats.push(c); });
+  document.getElementById("agExcludeCats").innerHTML = cats.map(function(c){
+    return '<label class="checkfield" style="padding:5px 0;"><input type="checkbox" class="agcat" value="'+escapeHtml(c)+'"'+
+      ((acc.excludeCats || []).indexOf(c) !== -1 ? ' checked' : '')+'> '+escapeHtml(c)+'</label>';
+  }).join("") || '<div class="empty-state" style="padding:8px 0;">카테고리가 없어요.</div>';
+  refreshExcludePreview();
   openOverlay("accGoalOverlay");
+}
+
+function readExcludeInputs(){
+  var words = document.getElementById("agExcludeWords").value.split(/[,，、\n]/).map(function(w){ return w.trim(); }).filter(function(w){ return w; });
+  var seen = {}, uniq = [];
+  words.forEach(function(w){ var k = w.toLowerCase(); if(!seen[k]){ seen[k] = 1; uniq.push(w.slice(0, 30)); } });
+  var cats = [];
+  document.querySelectorAll("#agExcludeCats .agcat").forEach(function(cb){ if(cb.checked) cats.push(cb.value); });
+  return { words: uniq, cats: cats };
+}
+
+function refreshExcludePreview(){
+  var acc = state.accounts.filter(function(a){ return a.id === ui.editingAccGoalId; })[0];
+  var el = document.getElementById("agExcludePreview");
+  if(!acc || !el) return;
+  var r = readExcludeInputs();
+  var tmp = { id: acc.id, includeFixed: acc.includeFixed, excludeCats: r.cats, excludeWords: r.words };
+  var exc = accountExcludedThisMonth(tmp);
+  el.textContent = (r.words.length || r.cats.length)
+    ? "이번 달 이 카드에서 실적 제외되는 내역: " + exc.count + "건 · " + won(exc.sum)
+    : "제외 항목을 정하면 이번 달 제외 금액을 여기서 바로 확인할 수 있어요.";
 }
 
 function saveAccGoalFromModal(){
   if(!ui.editingAccGoalId) return;
   var amount = Number(document.getElementById("agAmount").value) || 0;
   var includeFixed = document.getElementById("agIncludeFixed").checked;
-  updateAccountGoal(ui.editingAccGoalId, amount, includeFixed);
+  var ex = readExcludeInputs();
+  updateAccountGoal(ui.editingAccGoalId, amount, includeFixed, ex);
   closeOverlay("accGoalOverlay");
 }
 
@@ -4835,6 +4906,9 @@ function wireEvents(){
   });
 
   document.getElementById("btnSaveAccGoal").addEventListener("click", saveAccGoalFromModal);
+  document.getElementById("agExcludeWords").addEventListener("input", refreshExcludePreview);
+  document.getElementById("agExcludeCats").addEventListener("change", refreshExcludePreview);
+  document.getElementById("agIncludeFixed").addEventListener("change", refreshExcludePreview);
   document.getElementById("btnCancelAccGoal").addEventListener("click", function(){ closeOverlay("accGoalOverlay"); });
 
   document.querySelectorAll("#catTypeToggle button").forEach(function(b){
