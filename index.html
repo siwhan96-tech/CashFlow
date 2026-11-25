@@ -1065,12 +1065,12 @@ table.bprev tr.hdr td{background:var(--card-2);}
       <label>금액</label>
       <input type="number" id="fAmount" placeholder="0" inputmode="numeric">
     </div>
-    <button type="button" class="moretoggle" id="btnTxMore" aria-expanded="false"><span class="mt-label">메모·고정비·정산 더 보기</span><span class="mt-arrow">▾</span></button>
-    <div class="txmore" id="txMore">
     <div class="field">
       <label>메모 (선택)</label>
       <input type="text" id="fMemo" placeholder="메모">
     </div>
+    <button type="button" class="moretoggle" id="btnTxMore" aria-expanded="false"><span class="mt-label">고정비·정산 더 보기</span><span class="mt-arrow">▾</span></button>
+    <div class="txmore" id="txMore">
     <div class="field" id="fFixedModeField">
       <label>고정비 구분</label>
       <select id="fFixedMode">
@@ -1406,7 +1406,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-11-25-01";
+var APP_VERSION = "2026-11-25-02";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -2169,12 +2169,27 @@ function showConfirm(title, msg, onOk, infoOnly, opts){
   overlay.classList.add("show");
 }
 
+var LASTACC_KEY = "kr_cashflow_last_account";
+function lastUsedAccountId(){
+  var id = "";
+  try{ id = localStorage.getItem(LASTACC_KEY) || ""; }catch(e){}
+  var exists = function(x){ return !!x && state.accounts.some(function(a){ return a.id === x; }); };
+  if(exists(id)) return id;
+  for(var i = state.transactions.length - 1; i >= 0; i--){
+    var t = state.transactions[i];
+    if(t.type === "expense" && exists(t.account)) return t.account;
+  }
+  return "";
+}
+function rememberAccount(id){
+  try{ if(id) localStorage.setItem(LASTACC_KEY, id); }catch(e){}
+}
 function setTxMore(open){
   var box=document.getElementById("txMore"), btn=document.getElementById("btnTxMore");
   if(!box||!btn) return;
   box.classList.toggle("open", !!open);
   btn.setAttribute("aria-expanded", open ? "true" : "false");
-  btn.querySelector(".mt-label").textContent = open ? "접기" : "메모·고정비·정산 더 보기";
+  btn.querySelector(".mt-label").textContent = open ? "접기" : "고정비·정산 더 보기";
 }
 function openOverlay(id){ document.getElementById(id).classList.add("show"); }
 function closeOverlay(id){ document.getElementById(id).classList.remove("show"); }
@@ -4409,7 +4424,7 @@ function openTxModal(tx, recurringScope){
   document.getElementById("fFixedMode").value = (tx && (tx.fixedMode === "fixed" || tx.fixedMode === "variable")) ? tx.fixedMode : "";
   refreshFixedModeHint();
   if(defaultType === "expense"){
-    document.getElementById("fAccount").value = tx ? (tx.account||"") : (ui.activeTab === "card" && ui.listFilter.card.acc ? ui.listFilter.card.acc : "");
+    document.getElementById("fAccount").value = tx ? (tx.account||"") : (ui.activeTab === "card" && ui.listFilter.card.acc ? ui.listFilter.card.acc : lastUsedAccountId());
   }
   document.getElementById("btnDeleteTx").style.display = (tx && tx.id) ? "block" : "none";
   var settleField = document.getElementById("fSettleField");
@@ -4442,7 +4457,7 @@ function openTxModal(tx, recurringScope){
     recNote.style.display = "none";
     // recField visibility itself is governed by setTxType() above (new + expense only)
   }
-  setTxMore(!!(tx && ((tx.memo && String(tx.memo).trim()) || tx.fixedMode === "fixed" || tx.fixedMode === "variable" || tx.settleAmount > 0 || tx.recurringId)));
+  setTxMore(!!(tx && (tx.fixedMode === "fixed" || tx.fixedMode === "variable" || tx.settleAmount > 0 || tx.recurringId)));
   openOverlay("txOverlay");
 }
 
@@ -4468,6 +4483,7 @@ function saveTxFromModal(){
     memo: document.getElementById("fMemo").value.trim(),
     account: type === "expense" ? document.getElementById("fAccount").value : ""
   };
+  if(!ui.editingTxId && type === "expense") rememberAccount(data.account);
   var fixedModeVal = type === "expense" ? document.getElementById("fFixedMode").value : "";
   if(fixedModeVal === "fixed" || fixedModeVal === "variable") data.fixedMode = fixedModeVal;
   var recChk = document.getElementById("fRecurring");
