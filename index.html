@@ -638,6 +638,39 @@ body{font-family:var(--font);font-size:var(--fs-base);letter-spacing:-0.01em;lin
 .txrow .fixedtag{color:var(--fixed);background:var(--fixed-dim);border-radius:var(--r-xs);font-weight:700;}
 .tag-muted{color:var(--text-dim)!important;background:var(--track)!important;}
 .tag-settle{color:var(--good)!important;background:var(--good-dim)!important;}
+.tag-warn{color:var(--expense)!important;background:var(--expense-dim)!important;}
+/* 입력 확인 필요(계좌 미지정) 카드 */
+.warncard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;color:var(--text);
+  background:var(--warn-dim);border:1px solid var(--warn-line);border-radius:var(--radius);padding:13px 16px;margin-bottom:18px;cursor:pointer;}
+.warncard .wic{font-size:18px;flex:none;}
+.warncard .wmid{flex:1;min-width:0;}
+.warncard .wtitle{font-size:13.5px;font-weight:800;}
+.warncard .wsub{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+.warncard .wamt{font-size:15px;font-weight:800;color:var(--expense);flex:none;}
+.warncard .warr{color:var(--text-faint);flex:none;}
+/* 카테고리별 예산 */
+.budget-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;}
+.budget-head .cardtitle{margin-bottom:0;}
+.budget-head .bh-btns{display:flex;gap:6px;flex:none;}
+.pillbtn{font:inherit;font-size:11px;font-weight:700;border-radius:20px;padding:4px 10px;border:1px solid var(--border);background:var(--card);color:var(--text-dim);cursor:pointer;}
+.pillbtn.on{background:var(--primary-dim);color:var(--primary);border-color:var(--primary);}
+.budget-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.budget-sum .bs{background:var(--track);border-radius:10px;padding:9px 10px;}
+.budget-sum .bs .l{font-size:10.5px;color:var(--text-dim);font-weight:600;}
+.budget-sum .bs .v{font-size:14px;font-weight:800;margin-top:2px;}
+.budget-sum .bs .v.over{color:var(--expense);}
+.budget-sum .bs .v.daily{color:var(--primary);}
+.goalfill.warn{background:var(--fixed);}
+.goalfill.over{background:var(--expense);}
+.goalsub .over-tag{color:var(--expense);font-weight:700;}
+.budget-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);}
+.budget-row:last-child{border-bottom:none;}
+.budget-row .cn{flex:1;min-width:0;font-size:13px;font-weight:700;}
+.budget-row input[type=number]{width:120px;flex:none;text-align:right;}
+.budget-row.excl .cn{color:var(--text-faint);}
+.budget-row.excl input[type=number]{opacity:.4;}
+.budget-row .fixedchk{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);font-weight:700;flex:none;}
+.budget-row .fixedchk input{width:auto;}
 
 /* 범례 */
 .legend-row{padding:7px 0;font-size:var(--fs-md);border-bottom:1px solid var(--border);}
@@ -796,10 +829,12 @@ table.bprev tr.hdr td{background:var(--card-2);}
 
       <div class="tabpanel" id="panel-home" data-tab="home">
         <div class="grid4" id="homeSummary"></div>
+        <div id="homeMissingAcc"></div>
         <div class="cardbox" id="homeGoalBox" style="margin-bottom:18px;padding:14px 16px;display:none;">
           <div class="cardtitle" style="font-size:12.5px;margin-bottom:9px;">이번달 카드 실적</div>
           <div id="homeGoalList"></div>
         </div>
+        <div class="cardbox" id="homeBudgetBox" style="margin-bottom:18px;"></div>
         <div class="cardbox" style="margin-bottom:18px;">
           <div class="cardtitle">최근 6개월 추이</div>
           <div class="chartwrap"><canvas id="trendChart"></canvas></div>
@@ -1338,6 +1373,9 @@ table.bprev tr.hdr td{background:var(--card-2);}
     </div>
     <div class="sectiontitle">반복 고정비 관리</div>
     <div id="recurringManageList"></div>
+    <div class="sectiontitle">카테고리별 월 예산</div>
+    <div class="acchint" id="settingsBudgetHint" style="margin:0 0 8px;"></div>
+    <button class="btn-ghost" id="btnOpenBudget" style="width:100%;">예산 설정 열기</button>
     <div class="setactions">
       <button id="btnExport">CSV로 내보내기</button>
       <button id="btnImportTrigger">CSV에서 가져오기</button>
@@ -1347,6 +1385,23 @@ table.bprev tr.hdr td{background:var(--card-2);}
     </div>
     <div class="modalbtns">
       <button class="btn-primary" id="btnCloseSettings" style="flex:1;">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Budget modal -->
+<div class="overlay" id="budgetOverlay">
+  <div class="modal">
+    <h3>카테고리별 월 예산</h3>
+    <div class="acchint" style="margin:0 0 12px;">매달 같은 금액이 적용돼요. 비워두면 그 카테고리는 예산을 추적하지 않아요. '제외'에 체크한 카테고리(저축·대출 상환 등)는 예산 계산에서 빠져요.</div>
+    <div class="field">
+      <label class="checkfield"><input type="checkbox" id="bgIncludeFixed"> 고정비도 예산 사용액에 포함</label>
+    </div>
+    <div id="budgetCatList"></div>
+    <div class="acchint" id="budgetTotalHint" style="margin:10px 0 4px;"></div>
+    <div class="modalbtns">
+      <button class="btn-ghost" id="btnCancelBudget">취소</button>
+      <button class="btn-primary" id="btnSaveBudget">저장</button>
     </div>
   </div>
 </div>
@@ -1406,7 +1461,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-11-25-02";
+var APP_VERSION = "2026-11-26-01";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -1443,7 +1498,7 @@ var DEVICE_ID = (function(){
   }catch(e){ return "tmp"+Math.random().toString(36).slice(2,8); }
 })();
 
-var META_KEYS = ["startingBalance","categories","fixedCategories","chartExcludeCategories","categoryColors","accounts","loans","recurring","planItems","planEvents"];
+var META_KEYS = ["startingBalance","categories","fixedCategories","chartExcludeCategories","categoryColors","accounts","loans","recurring","planItems","planEvents","budgets"];
 
 function fbClean(o){ try{ return JSON.parse(JSON.stringify(o)); }catch(e){ return o; } }
 
@@ -1600,6 +1655,9 @@ function reconcileAndWatch(){
 function applyMeta(json){
   try{
     var m = JSON.parse(json);
+    /* 아직 업데이트 안 된 기기가 올린 설정에는 budgets가 없음 → 이 기기의 예산 설정을 지우지 않고 유지 */
+    if(!m || typeof m !== "object") return;
+    if(!("budgets" in m) && state && state.budgets) m.budgets = state.budgets;
     var merged = Object.assign({}, m, { transactions: state.transactions, events: state.events, shopItems: state.shopItems, babyItems: state.babyItems, _savedAt: state._savedAt });
     state = loadStateFromObj(merged);
     lastMetaJson = json;
@@ -1939,8 +1997,29 @@ function defaultState(){
     shopItems: [],
     babyItems: [],
     categoryColors: {},
-    chartExcludeCategories: []
+    chartExcludeCategories: [],
+    budgets: null
   };
+}
+
+/* ===== 카테고리별 월 예산 =====
+   state.budgets = { cats: {카테고리: 월예산}, excluded: [예산 계산에서 빼는 카테고리], includeFixed: 고정비 포함 여부 }
+   처음 만들 때는 저축/대출/상환/원리금이 들어간 카테고리를 기본 제외로 둔다 (모든 기기에서 같은 결과). */
+var BUDGET_DEFAULT_EXCLUDE_RE = /저축|대출|상환|원리금/;
+function normalizeBudgets(st){
+  var exp = (st.categories && Array.isArray(st.categories.expense)) ? st.categories.expense : [];
+  var b = (st.budgets && typeof st.budgets === "object") ? st.budgets : null;
+  if(!b){
+    b = { cats: {}, includeFixed: true, excluded: exp.filter(function(c){ return BUDGET_DEFAULT_EXCLUDE_RE.test(c); }) };
+  }
+  var cats = {};
+  if(b.cats && typeof b.cats === "object"){
+    Object.keys(b.cats).forEach(function(k){ var v = Number(b.cats[k]) || 0; if(v > 0) cats[k] = v; });
+  }
+  var excluded = Array.isArray(b.excluded) ? b.excluded.filter(function(x){ return typeof x === "string" && x; }) : [];
+  if(excluded.indexOf(SAVING_CATEGORY) === -1) excluded.push(SAVING_CATEGORY);
+  st.budgets = { cats: cats, excluded: excluded, includeFixed: b.includeFixed !== false };
+  return st;
 }
 
 // Migrate legacy loan entries (totalAmount/balance/monthlyPayment/dueDate)
@@ -1974,7 +2053,7 @@ function migrateLoan(l){
 function loadState(){
   try{
     var raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return ensureCategoryColors(ensureSavingCategory(defaultState()));
+    if(!raw) return normalizeBudgets(ensureCategoryColors(ensureSavingCategory(defaultState())));
     var parsed = JSON.parse(raw);
     var d = defaultState();
     parsed.startingBalance = Number(parsed.startingBalance)||0;
@@ -2014,9 +2093,9 @@ function loadState(){
     parsed.babyItems = Array.isArray(parsed.babyItems) ? parsed.babyItems.filter(function(x){ return x && x.id; }) : [];
     parsed.loans.forEach(migrateLoan);
     parsed.transactions.forEach(function(t){ if(typeof t.account !== "string") t.account = ""; });
-    return ensureCategoryColors(ensureSavingCategory(parsed));
+    return normalizeBudgets(ensureCategoryColors(ensureSavingCategory(parsed)));
   }catch(e){
-    return ensureCategoryColors(ensureSavingCategory(defaultState()));
+    return normalizeBudgets(ensureCategoryColors(ensureSavingCategory(defaultState())));
   }
 }
 
@@ -2290,6 +2369,16 @@ function scard(label, val, cls){
 
 function txIcon(type){ return type === "income" ? "💰" : "💳"; }
 
+/* 계좌 미지정(입력 누락 의심): 카드/계좌를 하나 이상 등록해 둔 상태에서, 지출(저축·자동계산 제외)에 계좌가 비어 있거나
+   삭제된 계좌를 가리키는 경우. 저장은 막지 않고 표시만 한다. 합계에는 그대로 포함, 카드 실적에는 원래부터 안 들어감. */
+var NO_ACC_FILTER = "__none__";
+function isMissingAccount(t){
+  if(t.type !== "expense" || t.autoBill || isSaving(t)) return false;
+  if(!state.accounts.length) return false;
+  if(!t.account) return true;
+  return !state.accounts.some(function(a){ return a.id === t.account; });
+}
+
 function txRowHtml(t, opts){
   opts = opts || {};
   var acc = state.accounts.filter(function(a){ return a.id === t.account; })[0];
@@ -2311,7 +2400,7 @@ function txRowHtml(t, opts){
     '<div class="txrow" data-id="'+t.id+'">'+
       '<div class="txcat" style="--c:'+catDisplayColor(t.category)+'">'+escapeHtml(catInitial(t.category, t.type))+'</div>'+
       '<div class="txmid">'+
-        '<div class="txcatname">'+escapeHtml(mainText)+(isFixed && !opts.hideFixedTag ? '<span class="fixedtag">고정비</span>' : '')+(isRecurring ? '<span class="fixedtag" style="color:var(--primary);background:var(--primary-dim);">🔁반복</span>' : '')+(t.autoBill ? '<span class="fixedtag tag-muted">🧮자동계산</span>' : '')+(isSettleLinked ? '<span class="fixedtag tag-settle">👥정산</span>' : '')+'</div>'+
+        '<div class="txcatname">'+escapeHtml(mainText)+(isFixed && !opts.hideFixedTag ? '<span class="fixedtag">고정비</span>' : '')+(isRecurring ? '<span class="fixedtag" style="color:var(--primary);background:var(--primary-dim);">🔁반복</span>' : '')+(t.autoBill ? '<span class="fixedtag tag-muted">🧮자동계산</span>' : '')+(isSettleLinked ? '<span class="fixedtag tag-settle">👥정산</span>' : '')+(isMissingAccount(t) ? '<span class="fixedtag tag-warn">계좌 미지정</span>' : '')+'</div>'+
         '<div class="txsub">'+escapeHtml(subParts.join(" · "))+'</div>'+
       '</div>'+
       '<div class="txamt '+t.type+'">'+(t.type === "income" ? "+" : "-")+won(opts.net && t.type === "expense" ? netAmount(t) : t.amount)+'</div>'+
@@ -2689,7 +2778,9 @@ function renderHome(){
   html += scard("순현금흐름", (tot.net>=0?"+":"")+won(tot.net), tot.net>=0?"income":"expense");
   document.getElementById("homeSummary").innerHTML = html;
 
+  renderHomeMissingAcc(list);
   renderHomeGoalBox();
+  renderHomeBudgetBox();
   renderTrendChart();
   renderLoanTab();   // 대출 관리 + 자금계획표 (홈 최하단)
 
@@ -2703,6 +2794,170 @@ function renderHome(){
     recentBox.innerHTML = recent.map(function(t){ return txRowHtml(t); }).join("");
     wireTxRowClicks("homeRecentList", recent);
   }
+}
+
+function renderHomeMissingAcc(list){
+  var box = document.getElementById("homeMissingAcc");
+  var miss = list.filter(isMissingAccount);
+  if(!miss.length){ box.innerHTML = ""; return; }
+  var sum = miss.reduce(function(s,t){ return s + (Number(t.amount)||0); }, 0);
+  box.innerHTML = '<button type="button" class="warncard" id="btnMissingAcc">'+
+    '<span class="wic">⚠️</span>'+
+    '<span class="wmid"><span class="wtitle" style="display:block;">입력 확인 필요 '+miss.length+'건</span>'+
+    '<span class="wsub" style="display:block;">카드/계좌가 비어 있는 지출이에요 · 눌러서 모아보기</span></span>'+
+    '<span class="wamt">'+won(sum)+'</span><span class="warr">›</span></button>';
+  document.getElementById("btnMissingAcc").addEventListener("click", function(){
+    ui.listFilter.card.acc = NO_ACC_FILTER;
+    ui.listFilter.card.cat = "";
+    switchTab("card");
+    var el = document.getElementById("cardList");
+    if(el && el.parentNode && el.parentNode.scrollIntoView) el.parentNode.scrollIntoView({ behavior:"smooth", block:"start" });
+  });
+}
+
+/* 예산 기준 월: 월 보기면 보고 있는 달, 전체기간 보기면 이번 달 */
+function budgetMonthKey(){
+  if(ui.viewMode === "all"){ var n = new Date(); return monthKeyFromDate(n.getFullYear(), n.getMonth()); }
+  return monthKeyFromDate(ui.viewDate.getFullYear(), ui.viewDate.getMonth());
+}
+/* 카테고리별 예산 사용액 (n빵 정산분은 뺀 실부담 기준, 카테고리 탭과 같은 기준) */
+function budgetSpentByCat(mk){
+  var b = state.budgets, out = {};
+  state.transactions.forEach(function(t){
+    if(t.type !== "expense" || txMonthKey(t.date) !== mk || isSaving(t)) return;
+    if(b.excluded.indexOf(t.category) !== -1) return;
+    if(!b.includeFixed && isFixedTx(t)) return;
+    out[t.category] = (out[t.category]||0) + netAmount(t);
+  });
+  return out;
+}
+function budgetedCats(){
+  var b = state.budgets;
+  var order = state.categories.expense.slice();
+  Object.keys(b.cats).forEach(function(c){ if(order.indexOf(c) === -1) order.push(c); });
+  return order.filter(function(c){ return b.cats[c] > 0 && b.excluded.indexOf(c) === -1; });
+}
+
+function renderHomeBudgetBox(){
+  var box = document.getElementById("homeBudgetBox");
+  var b = state.budgets;
+  var cats = budgetedCats();
+  var mk = budgetMonthKey();
+  var mLabel = Number(mk.slice(5,7)) + "월";
+  if(!cats.length){
+    box.innerHTML = '<div class="budget-head"><div class="cardtitle">카테고리별 예산</div>'+
+      '<div class="bh-btns"><button type="button" class="pillbtn" data-bgopen="1">예산 설정</button></div></div>'+
+      '<div class="acchint" style="margin:0;">식비·쇼핑처럼 카테고리별로 한 달 예산을 정해두면, 여기서 얼마나 썼는지와 하루에 얼마까지 써도 되는지 보여줘요.</div>';
+  } else {
+    var spent = budgetSpentByCat(mk);
+    var totB = 0, totS = 0, unbudgeted = 0;
+    cats.forEach(function(c){ totB += b.cats[c]; totS += spent[c]||0; });
+    Object.keys(spent).forEach(function(c){ if(cats.indexOf(c) === -1) unbudgeted += spent[c]; });
+    var remain = totB - totS;
+    var now = new Date();
+    var curMk = monthKeyFromDate(now.getFullYear(), now.getMonth());
+    var y = Number(mk.slice(0,4)), m = Number(mk.slice(5,7));
+    var dim = new Date(y, m, 0).getDate();
+    var third;
+    if(mk === curMk){
+      var daysLeft = dim - now.getDate() + 1;   // 오늘 포함
+      third = '<div class="bs"><div class="l">하루 권장 ('+daysLeft+'일 남음)</div><div class="v daily">'+(remain > 0 ? won(Math.floor(remain / daysLeft)) : "0원")+'</div></div>';
+    } else if(mk < curMk){
+      third = '<div class="bs"><div class="l">'+mLabel+' 결과</div><div class="v'+(remain < 0 ? ' over' : '')+'">'+(remain < 0 ? won(-remain)+' 초과' : won(remain)+' 남김')+'</div></div>';
+    } else {
+      third = '<div class="bs"><div class="l">하루 권장</div><div class="v daily">'+won(Math.floor(totB / dim))+'</div></div>';
+    }
+    var html = '<div class="budget-head"><div class="cardtitle">'+mLabel+' 카테고리별 예산</div>'+
+      '<div class="bh-btns"><button type="button" class="pillbtn'+(b.includeFixed ? ' on' : '')+'" id="btnBudgetFixed">'+(b.includeFixed ? '✓ ' : '')+'고정비 포함</button>'+
+      '<button type="button" class="pillbtn" data-bgopen="1">설정</button></div></div>';
+    html += '<div class="budget-sum">'+
+      '<div class="bs"><div class="l">사용 / 예산</div><div class="v'+(remain < 0 ? ' over' : '')+'">'+won(totS)+'</div><div class="l" style="margin-top:1px;">/ '+won(totB)+'</div></div>'+
+      '<div class="bs"><div class="l">'+(remain < 0 ? '초과' : '남은 예산')+'</div><div class="v'+(remain < 0 ? ' over' : '')+'">'+won(Math.abs(remain))+'</div></div>'+
+      third + '</div>';
+    html += cats.map(function(c){
+      var bud = b.cats[c], s = spent[c]||0;
+      var ratio = s / bud;
+      var pct = Math.round(ratio * 100);
+      var cls = ratio > 1 ? ' over' : (ratio >= 0.85 ? ' warn' : '');
+      var left = bud - s;
+      return '<div class="goalrow">'+
+        '<div class="goalrow-top"><span class="nm">'+escapeHtml(c)+'</span>'+
+        '<span class="amt"><b>'+won(s)+'</b> / '+won(bud)+'</span></div>'+
+        '<div class="goaltrack"><div class="goalfill'+cls+'" style="width:'+Math.min(100, pct)+'%"></div></div>'+
+        '<div class="goalsub">'+
+        (left < 0 ? '<span class="over-tag">'+won(-left)+' 초과</span>' : '<span class="left-tag">'+won(left)+' 남음</span>')+
+        '<span>'+pct+'%</span></div></div>';
+    }).join("");
+    if(unbudgeted > 0) html += '<div class="acchint" style="margin:10px 0 0;">예산을 안 정한 카테고리에서 '+won(unbudgeted)+' 썼어요 (제외 카테고리는 빼고).</div>';
+    box.innerHTML = html;
+    document.getElementById("btnBudgetFixed").addEventListener("click", function(){
+      state.budgets.includeFixed = !state.budgets.includeFixed;
+      saveState(); render();
+    });
+  }
+  box.querySelectorAll("[data-bgopen]").forEach(function(btn){ btn.addEventListener("click", openBudgetModal); });
+}
+
+function budgetModalRowsHtml(draft){
+  var cats = state.categories.expense.slice();
+  return cats.map(function(c){
+    var excl = draft.excluded.indexOf(c) !== -1;
+    var locked = c === SAVING_CATEGORY;
+    return '<div class="budget-row'+(excl ? ' excl' : '')+'"><span class="cn">'+escapeHtml(c)+'</span>'+
+      '<input type="number" class="bginput" inputmode="numeric" placeholder="미설정" data-cat="'+escapeHtml(c)+'" value="'+(draft.cats[c] ? draft.cats[c] : '')+'"'+(excl ? ' disabled' : '')+'>'+
+      '<label class="fixedchk"><input type="checkbox" class="bgexcl" data-cat="'+escapeHtml(c)+'"'+(excl ? ' checked' : '')+(locked ? ' disabled' : '')+'> 제외</label></div>';
+  }).join("");
+}
+function readBudgetDraft(){
+  var cats = {}, excluded = [];
+  document.querySelectorAll("#budgetCatList .bginput").forEach(function(inp){
+    var v = Math.round(Number(inp.value) || 0);
+    if(v > 0) cats[inp.dataset.cat] = v;
+  });
+  document.querySelectorAll("#budgetCatList .bgexcl").forEach(function(cb){ if(cb.checked) excluded.push(cb.dataset.cat); });
+  // 목록에 없는(삭제·이름 변경된) 카테고리의 기존 제외 설정은 보존
+  state.budgets.excluded.forEach(function(c){ if(state.categories.expense.indexOf(c) === -1 && excluded.indexOf(c) === -1) excluded.push(c); });
+  return { cats: cats, excluded: excluded, includeFixed: document.getElementById("bgIncludeFixed").checked };
+}
+function refreshBudgetTotalHint(){
+  var d = readBudgetDraft();
+  var tot = 0, n = 0;
+  Object.keys(d.cats).forEach(function(c){ if(d.excluded.indexOf(c) === -1){ tot += d.cats[c]; n++; } });
+  document.getElementById("budgetTotalHint").textContent = n ? ("예산 합계 "+won(tot)+" ("+n+"개 카테고리)") : "아직 정한 예산이 없어요.";
+}
+function openBudgetModal(){
+  closeOverlay("settingsOverlay");
+  var b = state.budgets;
+  document.getElementById("bgIncludeFixed").checked = b.includeFixed;
+  var box = document.getElementById("budgetCatList");
+  box.innerHTML = budgetModalRowsHtml(b);
+  box.querySelectorAll(".bgexcl").forEach(function(cb){
+    cb.addEventListener("change", function(){
+      var row = cb.closest(".budget-row");
+      row.classList.toggle("excl", cb.checked);
+      row.querySelector(".bginput").disabled = cb.checked;
+      refreshBudgetTotalHint();
+    });
+  });
+  box.querySelectorAll(".bginput").forEach(function(inp){ inp.addEventListener("input", refreshBudgetTotalHint); });
+  refreshBudgetTotalHint();
+  openOverlay("budgetOverlay");
+}
+function saveBudgetFromModal(){
+  var d = readBudgetDraft();
+  // 제외로 바꾼 카테고리의 금액은 남겨두지 않음(다시 포함할 때 새로 입력)
+  Object.keys(d.cats).forEach(function(c){ if(d.excluded.indexOf(c) !== -1) delete d.cats[c]; });
+  state.budgets = d;
+  normalizeBudgets(state);
+  saveState();
+  closeOverlay("budgetOverlay");
+  render();
+}
+function settingsBudgetHintText(){
+  var cats = budgetedCats();
+  if(!cats.length) return "아직 정한 예산이 없어요.";
+  var tot = cats.reduce(function(s,c){ return s + state.budgets.cats[c]; }, 0);
+  return cats.length + "개 카테고리 · 월 " + won(tot) + (state.budgets.includeFixed ? " · 고정비 포함" : " · 고정비 제외");
 }
 
 function renderTrendChart(){
@@ -3040,7 +3295,9 @@ function renderCardTab(){
 
   var accSel = document.getElementById("cardAccFilter");
   var prevAcc = ui.listFilter.card.acc;
-  accSel.innerHTML = '<option value="">전체 계좌</option>' + state.accounts.map(function(a){ return '<option value="'+a.id+'">'+escapeHtml(a.name)+'</option>'; }).join("");
+  accSel.innerHTML = '<option value="">전체 계좌</option>' + state.accounts.map(function(a){ return '<option value="'+a.id+'">'+escapeHtml(a.name)+'</option>'; }).join("") +
+    (state.accounts.length ? '<option value="'+NO_ACC_FILTER+'">⚠ 계좌 미지정</option>' : '');
+  if(prevAcc === NO_ACC_FILTER && !state.accounts.length) prevAcc = ui.listFilter.card.acc = "";
   accSel.value = prevAcc;
 
   var catSel = document.getElementById("cardCatFilter");
@@ -3059,7 +3316,7 @@ function renderCardTab(){
   spendExpense.forEach(function(t){
     var amt = Number(t.amount)||0;
     if(t.settleAmount > 0) settleSum += Number(t.settleAmount)||0;
-    if(!t.account){
+    if(!t.account || !state.accounts.some(function(a){ return a.id === t.account; })){   // 비어 있거나 삭제된 계좌
       noAcc.total += amt;
       if(isFixedTx(t)) noAcc.fixed += amt;
       return;
@@ -3136,7 +3393,8 @@ function renderCardTab(){
   // filtered card list
   var f = ui.listFilter.card;
   var list = allExpense.filter(function(t){
-    if(f.acc && t.account !== f.acc) return false;
+    if(f.acc === NO_ACC_FILTER){ if(!isMissingAccount(t)) return false; }
+    else if(f.acc && t.account !== f.acc) return false;
     if(f.cat && t.category !== f.cat) return false;
     return true;
   }).sort(function(a,b){ return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); });
@@ -4424,7 +4682,7 @@ function openTxModal(tx, recurringScope){
   document.getElementById("fFixedMode").value = (tx && (tx.fixedMode === "fixed" || tx.fixedMode === "variable")) ? tx.fixedMode : "";
   refreshFixedModeHint();
   if(defaultType === "expense"){
-    document.getElementById("fAccount").value = tx ? (tx.account||"") : (ui.activeTab === "card" && ui.listFilter.card.acc ? ui.listFilter.card.acc : lastUsedAccountId());
+    document.getElementById("fAccount").value = tx ? (tx.account||"") : (ui.activeTab === "card" && ui.listFilter.card.acc && ui.listFilter.card.acc !== NO_ACC_FILTER ? ui.listFilter.card.acc : lastUsedAccountId());
   }
   document.getElementById("btnDeleteTx").style.display = (tx && tx.id) ? "block" : "none";
   var settleField = document.getElementById("fSettleField");
@@ -4648,6 +4906,7 @@ function openSettingsModal(){
   document.querySelectorAll("#catGroupTabs button").forEach(function(b){ b.classList.toggle("active", b.dataset.g === "income"); });
   renderCatManageList();
   renderRecurringManageList();
+  document.getElementById("settingsBudgetHint").textContent = settingsBudgetHintText();
   var dOwner = deviceOwner();
   document.querySelectorAll("#deviceOwnerToggle button").forEach(function(b){
     b.classList.toggle("active", b.dataset.owner === dOwner);
@@ -4824,6 +5083,10 @@ function saveRenameCat(){
   if(state.categoryColors && state.categoryColors[ctx.oldName]){
     state.categoryColors[newName] = state.categoryColors[ctx.oldName];
     delete state.categoryColors[ctx.oldName];
+  }
+  if(ctx.group === "expense" && state.budgets){
+    if(state.budgets.cats[ctx.oldName]){ state.budgets.cats[newName] = state.budgets.cats[ctx.oldName]; delete state.budgets.cats[ctx.oldName]; }
+    state.budgets.excluded = state.budgets.excluded.map(function(x){ return x===ctx.oldName ? newName : x; });
   }
   (state.transactions||[]).forEach(function(t){ if(t.category === ctx.oldName) t.category = newName; });
   (state.recurring||[]).forEach(function(r){ if(r.category === ctx.oldName) r.category = newName; });
@@ -5153,6 +5416,10 @@ function wireEvents(){
   });
   document.getElementById("settingsAddCat").addEventListener("click", addSettingsCategory);
   document.getElementById("settingsNewCat").addEventListener("keydown", function(e){ if(e.key==="Enter") addSettingsCategory(); });
+  document.getElementById("btnOpenBudget").addEventListener("click", openBudgetModal);
+  document.getElementById("btnSaveBudget").addEventListener("click", saveBudgetFromModal);
+  document.getElementById("btnCancelBudget").addEventListener("click", function(){ closeOverlay("budgetOverlay"); });
+  document.getElementById("bgIncludeFixed").addEventListener("change", refreshBudgetTotalHint);
   document.getElementById("startBalanceInput").addEventListener("change", function(){
     state.startingBalance = Number(document.getElementById("startBalanceInput").value)||0;
     saveState(); render();
