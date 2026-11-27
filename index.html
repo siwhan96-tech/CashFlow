@@ -42,7 +42,7 @@
   --border-strong:#cfd5dc;
   /* 글자 */
   --text:#151a23;
-  --text-dim:#6a7280;
+  --text-dim:#5f6775;
   --text-faint:#a3a9b4;
   /* 실행 버튼(먹색) + 강조색(인디고) */
   --solid:#1a2130;
@@ -52,23 +52,23 @@
   --primary-dim:#ecedfc;
   --primary-ring:rgba(74,79,214,.22);
   /* 돈의 의미 색 */
-  --income:#2f6be6;
+  --income:#2a62d8;
   --income-dim:#e9f0fd;
-  --expense:#e0393e;
+  --expense:#cc2a2f;
   --expense-dim:#fdecec;
-  --saving:#0e9384;
+  --saving:#0a766a;
   --saving-dim:#e3f5f2;
-  --fixed:#c26a12;
+  --fixed:#9f540a;
   --fixed-dim:#fbf0e3;
   --other:#2f9fd6;
-  --good:#16884a;
+  --good:#127a42;
   --good-dim:#e5f6ec;
   --warn-dim:#fdf6e2;
   --warn-dim2:#fefaf0;
   --warn-line:#ecd58f;
   /* 일정 소유자 */
   --owner-h:#2f6be6;
-  --owner-w:#d8407e;
+  --owner-w:#c42c6f;
   --owner-both:#7a4fd8;
   /* 반경 */
   --r-xs:6px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:22px;
@@ -788,6 +788,51 @@ table.bprev tr.hdr td{background:var(--card-2);}
   .calsum .scard .slabel{font-size:var(--fs-xs);margin-bottom:4px;}
 }
 
+/* =========================================================
+   UI 리뷰 반영 (2026-11-27)
+   ========================================================= */
+/* 요약 카드: 좁은 창(태블릿)에서 잘리지 않게 칸 수를 자동으로 */
+.grid4{grid-template-columns:repeat(2,1fr);}
+.scard .sval{overflow-wrap:anywhere;}
+/* 넓은 화면에서 본문 폭 제한 */
+.content{width:100%;max-width:1120px;margin-left:auto;margin-right:auto;}
+/* 카테고리 칩 글자색: 배경색과 섞지 않고 본문색과 섞어서 대비 확보 */
+.txrow .txcat{color:color-mix(in srgb, var(--c) 55%, var(--text));}
+.warncard .warr{color:var(--text-dim);}
+.warncard .wsub{color:var(--text-dim);}
+/* 너무 작은 글자 키우기 */
+.fixedtag,.goalsub,.goalsub .met-tag,.goalsub .left-tag,.goalsub .over-tag,.budget-sum .bs .l{font-size:11px;}
+.txrow .fixedtag{font-size:11px;}
+.typetoggle button,.settabs button,.setactions button,.modalbtns button{min-height:44px;}
+.catmanage-row .cmord{font-size:11px;padding:8px 10px;}
+.catmanage-row .editcat,.catmanage-row .delcat{min-width:36px;min-height:36px;font-size:16px;}
+/* 터치 영역 키우기 (손가락 기준 40~44px) */
+.navbtn,.monthnav .navbtn{width:40px;height:40px;}
+.iconbtn{width:40px;height:40px;}
+.toggleall{min-height:40px;padding:0 14px;}
+.filters select,.filters input[type=text]{min-height:40px;}
+.btn-ghost{min-height:44px;}
+.daybtn{min-height:40px;}
+.pillbtn{min-height:32px;padding:6px 12px;}
+.shoprow{padding:8px 2px;}
+.shoprow input[type=checkbox]{width:26px;height:26px;}
+.shoprow .shopdel{min-width:44px;min-height:44px;font-size:22px;}
+.fab{transition:transform .22s var(--ease),opacity .22s var(--ease);}
+.fab.fab-hide{transform:translateY(110px) scale(.9);opacity:0;pointer-events:none;}
+@media (max-width:759px){
+  /* 상단바: 1줄 제목+설정, 2줄 월 이동 (예전엔 최대 3줄로 갈라졌음) */
+  .topbar{display:grid;grid-template-columns:1fr auto auto auto;grid-template-areas:"title badge menu gear" "nav nav nav nav";
+    align-items:center;column-gap:8px;row-gap:6px;padding-top:max(10px, env(safe-area-inset-top));padding-bottom:10px;}
+  .topbar .tright{display:contents;}
+  .topbar .ttitle{grid-area:title;flex:none;}
+  .topbar #syncBadge{grid-area:badge;}
+  .topbar #btnCardMenu{grid-area:menu;}
+  .topbar #btnSettings{grid-area:gear;}
+  .topbar .monthnav{grid-area:nav;display:flex;gap:6px;}
+  .topbar .monthnav .mlabel{flex:1;text-align:center;font-size:var(--fs-lg);}
+}
+@media (min-width:900px){ .grid4{grid-template-columns:repeat(4,1fr);} }
+
 /* 입력창: 핵심 4칸만 먼저, 나머지는 펼치기 */
 .moretoggle{display:flex;align-items:center;justify-content:space-between;width:100%;border:none;background:var(--card-2);
   color:var(--text-dim);border-radius:var(--r-md);padding:12px 14px;font-size:var(--fs-md);font-weight:700;margin:2px 0 4px;}
@@ -1463,7 +1508,7 @@ var STORAGE_KEY = "kr_cashflow_dashboard_v2";
 /* 파일 내용이 바뀔 때마다 이 값도 같이 바꿔주세요.
    iOS 홈화면 바로가기는 캐시를 오래 들고 있어서, 이 값이 서버 파일과 다르면
    "새 버전이 있어요" 배너를 띄워 강제 새로고침을 유도합니다. */
-var APP_VERSION = "2026-11-26-02";
+var APP_VERSION = "2026-11-27-01";
 /* =========================================================
    FIREBASE 접속 주소
    여기를 비워두면 앱 안의 [설정] 화면에서 직접 입력할 수 있습니다.
@@ -3030,7 +3075,7 @@ function renderTrendChart(){
       datasets:{ bar:{ categoryPercentage:0.62, barPercentage:0.9 } },
       scales:{
         x:{ grid:{ display:false }, border:{ display:false } },
-        y:{ border:{ display:false }, grid:{ color:cssVar("--border") }, ticks:{ maxTicksLimit:5, callback:function(v){ return (v/10000)+"만"; } } }
+        y:{ beginAtZero:true, suggestedMax:(incomeData.concat(expenseData, savingData).some(function(v){ return v > 0; }) ? undefined : 5000000), border:{ display:false }, grid:{ color:cssVar("--border") }, ticks:{ maxTicksLimit:5, callback:function(v){ return (v/10000)+"만"; } } }
       },
       plugins:{
         legend:{ position:"bottom", labels:{ usePointStyle:true, pointStyle:"rectRounded", boxWidth:8, boxHeight:8, padding:16 } },
@@ -3410,7 +3455,7 @@ function renderCardTab(){
       var sub = txs.reduce(function(s,t){ return s+(Number(t.amount)||0); }, 0);
       var rows = txs.map(function(t){
         var col = catDisplayColor(t.category);
-        return '<tr><td class="fc-cat"><span class="fc-catpill" style="background:color-mix(in srgb, '+col+' 15%, transparent);color:'+col+'">'+escapeHtml(t.category)+'</span></td>'+
+        return '<tr><td class="fc-cat"><span class="fc-catpill" style="background:color-mix(in srgb, '+col+' 15%, transparent);color:color-mix(in srgb, '+col+' 55%, var(--text))">'+escapeHtml(t.category)+'</span></td>'+
           '<td class="fc-memo">'+escapeHtml(t.memo || t.category)+'</td>'+
           '<td class="fc-amt">'+won(t.amount)+'</td></tr>';
       }).join("");
@@ -5600,12 +5645,26 @@ function showUpdateBanner(){
 }
 
 /* ================= Init ================= */
+/* 스크롤을 내리는 동안엔 + 버튼을 치워서 금액·내용을 가리지 않게, 올리면 다시 나타남 */
+function wireFabAutoHide(){
+  var fab = document.getElementById("btnAdd");
+  if(!fab) return;
+  var lastY = window.pageYOffset || 0;
+  window.addEventListener("scroll", function(){
+    var y = window.pageYOffset || 0;
+    if(y > lastY + 6 && y > 120) fab.classList.add("fab-hide");
+    else if(y < lastY - 6 || y <= 120) fab.classList.remove("fab-hide");
+    lastY = y;
+  }, { passive: true });
+}
+
 function init(){
   state = loadState();
   syncBillTransactions();
   materializeRecurring();
   buildNav();
   wireEvents();
+  wireFabAutoHide();
   switchTab("home");
   // Firebase 연결 — 첫 렌더링 이후에 시작해서 화면이 먼저 뜼도록 함
   setTimeout(firebaseInit, 300);
